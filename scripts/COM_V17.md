@@ -69,3 +69,17 @@ collisions. This is a bounded observation, not a proof that all logging races
 are eliminated. After the suite, interrupt MI1 reports USB error257 at
 tick2484207, followed by detach2484280 and successful joins. The error is
 preserved; its cause is not identified and reboot stability is not improved.
+
+Second test tick2557919: AT/ATI4/4, CHECKS150 FAILURES47 COMPLETE, NOT a
+second pass. COM1 loses USB at RX_EXIT2559397 /DETACH2559571 during duplex
+testing; later operations on that same handle fail1609. The suite does not
+reopen a failed handle to hide this. COM5 subsequently opens a fresh V17
+instance and its checks pass, including accepted11/knownE0. Failed outputs
+are retained as test-second/driver-second before one final bounded retest.
+
+Third fresh test tick2643684: both instances17, AT/ATI4/4 CHECKS150
+FAILURES0 COMPLETE. Both snapshots again show accepted11/rejected0,
+knownE0/status00/raw00/error0. The final cumulative trace contains66 parsed
+notifications and no lines with multiple tick markers. First and third are
+complete passing windows separated by the second failed window, NOT
+consecutive passes or long-term stability. All three outputs are retained.
