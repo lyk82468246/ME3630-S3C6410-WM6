@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：V6 确认模块 Linux 重启，供电成为优先排查项
+
+通过Joe实际32位PowerShell/WMDC运行90秒V5稳定性应用，保持COM句柄直到I/O失效后关闭重开，仅查询AT/CFUN/CPIN并采样WM6系统电源状态。elapsed=90094ms，generations=4、successful_queries=27、losses=4；旧句柄写失败error1609，随后可重开。系统采样均systemon，不能证明模块供电正常。起初CFUN1/CPIN READY，后来CFUN0/SIM_NOT_INSERTED；用户明确未拔插、取放SIM或改变供电。证据evidence/2026-10-11-stability/monitor.txt、driver-window.txt。完整历史driver-v5.txt留本地；基线CFUN查询kind误标2，派生CFUN状态正确，后续源代码/二进制修正标签但未重跑，不改写原证据。
+
+新增V6固定只读ADB探针，对MI4 ff/42/01进行legacy CNXN并只执行cat /proc/uptime /proc/sys/kernel/random/boot_id，AUTH即停止，不记录banner、不写模块配置。每枚举至多4个样本，传输有界。独立ME3630ComV6.dll保留V5回退，实机安装dll_load=1 installed=1 error0；串口复测4/4命令、32/32控制、FAILURES0。证据evidence/2026-10-11-com-v6/install.txt、driver.txt、test.txt（IMEI脱敏，原始留本地）。部分V4/V5日志字符串为继承实现，并不表示加载旧DLL。
+
+三个ATTACH tick13100417/13125536/13154305分别得到boot_id=46cec7d0-aedc-4688-aad0-17392989ecda、163cc7c6-3f5a-4838-a5d0-68015eb152be、91ac2c87-9d0f-4f56-9c67-9eacf8693dc6，首次uptime分别11.24/11.68/11.14秒。确认模块Linux内核重新启动，不只是WM6串口移除；仍无法区分电压跌落、看门狗、固件或USB交互触发崩溃。summarize_bootinfo.ps1可复核，uptime和boot_id有时分属不同WRTE帧。
+
+用户明确转接板完全由WM6 USB Host供电。厂商mini-PCIE硬件指南V1.5第5.1-5.4节指定模块V_MAIN为3.0-4.0V，恶劣射频环境瞬时峰值可达2.3A，设计峰值能力至少2.5A；这是模块侧设计要求，不是本次实测电流，也不是转接板USB5V输入规格。未测量WM6限流、转接板稳压或电压波形，故只能提高供电假设优先级。下一步先核验转接板型号/供电输入及防反灌，再进行只改变供电的对照；不直接向模块送5V、不并联电源、不改LeadCore/WMDC、不拨号。指南与协议主来源链接、操作范围见scripts/ADB_V6.md。
+
 ## 2026-10-11：V5 COM 全部基础检查通过并保存里程碑
 
 最新复测摘要：COMMANDS_PASSED=4/4 CONTROL_CHECKS=32 FAILURES=0 COMPLETE。COM1/COM5均成功打开；Get/SetCommState、DCB回读、Get/SetCommTimeouts、超时回读、DTR/RTS请求、非法配置拒绝、独占打开全部符合已定义子集。两次350ms空读实测均352ms，成功返回0字节。每条AT响应先读1字节、后读5字节；ATI先读1字节、后读111字节，两个通道均得到完整OK、ME3630及ME3630C1AV2.0B01，验证了小应用缓冲区不会截断USB缓存中的剩余响应。

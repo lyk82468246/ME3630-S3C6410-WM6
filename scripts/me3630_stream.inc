@@ -92,6 +92,9 @@ BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWOR
 #endif
 void M36_PowerUp(DWORD context){}
 void M36_PowerDown(DWORD context){}
+#ifdef COM_V6
+#include "me3630_adb.inc"
+#endif
 static DWORD WINAPI worker(LPVOID param)
 {
     PROBE *p=(PROBE*)param;DWORD i,bytes,index,disp;PORT *port;HKEY key;WCHAR path[96];
@@ -129,7 +132,11 @@ static DWORD WINAPI worker(LPVOID param)
         if(!wait_transfer(p,t,1000,&bytes))continue;
 #ifdef COM_V4
 #ifdef COM_V5
+#ifdef COM_V6
+        wsprintfW(path,L"Drivers\\ME3630ComV6\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV5\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV4\\Port%lu",port->index);
 #endif
@@ -141,7 +148,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V4
         index=port->index==1?1:5;
 #ifdef COM_V5
+#ifdef COM_V6
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV6.dll",sizeof(L"ME3630ComV6.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV5.dll",sizeof(L"ME3630ComV5.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV4.dll",sizeof(L"ME3630ComV4.dll"));
 #endif
@@ -159,7 +170,10 @@ static DWORD WINAPI worker(LPVOID param)
         logline(L"V3 ACTIVATE M36%lu: handle=%08lx error=%lu\r\n",index,(DWORD)port->active,GetLastError());
 #endif
     }
-#ifdef COM_V5
+#ifdef COM_V6
+    logline(L"V6 READY\r\n");
+    adb_boot_probe(p);
+#elif defined(COM_V5)
     logline(L"V5 READY\r\n");
 #elif defined(COM_V4)
     logline(L"V4 READY\r\n");

@@ -6,7 +6,9 @@
 
 ## 当前结论
 
-- 当前实机已安装自编 V5：COM1:（MI1/AT）、COM5:（MI2/MODEM），支持基础115200/8N1配置、DCB/超时回读、DTR/RTS请求与有界读写。AT/ATI 4/4、控制检查32/32通过；1字节读取后剩余响应完整保留。反复重枚举尚未解决，事件/调制解调器状态/双向并发/PPP尚未实现，不能当作稳定拨号驱动。源码范围和操作见 scripts/COM_V4.md，证据 evidence/2026-10-11-com-v5/test.txt。
+- 当前实机已更新为 V6，增加只读 ADB 启动诊断：连续三个枚举窗口出现不同 Linux boot_id，uptime 重新从约11秒起算，确认是模块自身重启，不只是 COM 掉线。串口复测仍为4/4命令、32/32控制检查通过。用户确认模块完全由WM6 USB Host供电，供电需优先排查，但尚未确认根因。下一步先核验转接板的独立供电接法，做仅改变供电的对照测试。详见 scripts/ADB_V6.md 和 evidence/2026-10-11-com-v6/driver.txt；尚未拨号。
+
+- V5已验证串口子集，V6继承：COM1:（MI1/AT）、COM5:（MI2/MODEM），支持基础115200/8N1配置、DCB/超时回读、DTR/RTS请求与有界读写。AT/ATI 4/4、控制检查32/32通过；1字节读取后剩余响应完整保留。反复重枚举尚未解决，事件/调制解调器状态/双向并发/PPP尚未实现，不能当作稳定拨号驱动。源码范围和操作见 scripts/COM_V4.md，证据 evidence/2026-10-11-com-v5/test.txt。
 
 - V3 已在实机提供 M361:（AT）、M362:（MODEM）诊断流接口。独立应用通过 CreateFile/WriteFile/ReadFile 对两个接口执行 AT/ATI，4/4 成功，型号/固件正确，各传输 USB 错误0。不是标准 COM 驱动：尚缺串口控制、事件和电源管理。测试过程中发现反复重枚举；短时重置空闲计时器后成功，原因仍需确认。详见 scripts/STREAM_V3.md 和 evidence/2026-10-11-stream-v3/test.txt。
 

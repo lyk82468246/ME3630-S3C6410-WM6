@@ -54,7 +54,11 @@ void mainCRTStartup(void)
     static const char *commands[]={"AT\r","ATI\r"};
 #ifdef COM_V4
 #ifdef COM_V5
+#ifdef COM_V6
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v6.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v5.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif

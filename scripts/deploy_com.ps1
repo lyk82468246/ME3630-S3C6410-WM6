@@ -1,4 +1,4 @@
-param([switch]$PullOnly,[switch]$Test,[switch]$Version5)
+param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6)
 $ErrorActionPreference='Stop'
 if([Environment]::Is64BitProcess){throw 'Use 32-bit PowerShell'}
 $source=Get-Content 'C:\Users\Joe\Documents\C#\Positron\scripts\device_gate.ps1' -Raw
@@ -6,6 +6,7 @@ $match=[regex]::Match($source,"(?s)\`$rapiSource = @'\r?\n(.*?)\r?\n'@")
 if(!$match.Success){throw 'RAPI helper missing'}
 Add-Type -TypeDefinition $match.Groups[1].Value
 $version=4;if($Version5){$version=5}
+if($Version6){if($Version5){throw 'Select a single version'};$version=6}
 $out=Join-Path $PSScriptRoot "..\evidence\2026-10-11-com-v$version"
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 try {
@@ -27,6 +28,7 @@ try {
  }
  if([PositronDeviceRapi]::TryCopyFileFromDevice("\Temp\ME3630-com-v$version.txt","$out\driver.txt")){Get-Content "$out\driver.txt" -Encoding Unicode -Tail 50}
  $testLog='\Temp\ME3630-com-test.txt';if($Version5){$testLog='\Temp\ME3630-com-test-v5.txt'}
+ if($Version6){$testLog='\Temp\ME3630-com-test-v6.txt'}
  if([PositronDeviceRapi]::TryCopyFileFromDevice($testLog,"$out\test-raw.txt")) {
   $redacted=(Get-Content "$out\test-raw.txt" -Encoding Unicode -Raw) -replace '(?im)(IMEI\s*:\s*)[0-9]+','$1[REDACTED]'
   $redacted | Set-Content "$out\test.txt" -Encoding Unicode;Write-Output $redacted

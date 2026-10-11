@@ -17,6 +17,10 @@ typedef struct {
     HANDLE stop, thread;
     USB_ENDPOINT_DESCRIPTOR in[2], out[2];
     DWORD iface[2], count;
+#ifdef COM_V6
+    USB_ENDPOINT_DESCRIPTOR adbIn,adbOut;
+    BOOL adbFound;
+#endif
 #ifdef STREAM_V3
     void *ports[2];
     LONG refs;
@@ -36,7 +40,11 @@ static void logline(LPCWSTR format,...)
 #ifdef STREAM_V3
 #ifdef COM_V4
 #ifdef COM_V5
+#ifdef COM_V6
+    file=CreateFile(L"\\Temp\\ME3630-com-v6.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
     file=CreateFile(L"\\Temp\\ME3630-com-v5.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
 #else
     file=CreateFile(L"\\Temp\\ME3630-com-v4.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 #endif
@@ -192,6 +200,13 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
             p->iface[p->count]=iface->Descriptor.bInterfaceNumber;
             p->in[p->count]=*in;p->out[p->count]=*out;p->count++;
         }
+#ifdef COM_V6
+        if(iface->Descriptor.bAlternateSetting==0 && iface->Descriptor.bInterfaceNumber==4 &&
+           iface->Descriptor.bInterfaceClass==0xff && iface->Descriptor.bInterfaceSubClass==0x42 &&
+           iface->Descriptor.bInterfaceProtocol==1 && in && out) {
+            p->adbIn=*in;p->adbOut=*out;p->adbFound=TRUE;
+        }
+#endif
     }
     if(!usb->lpRegisterNotificationRoutine(device,detach,p)) {CloseHandle(p->stop);LocalFree(p);return FALSE;}
     p->thread=CreateThread(NULL,0,worker,p,0,NULL);
