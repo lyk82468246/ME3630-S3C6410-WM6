@@ -30,5 +30,6 @@ __pycache__/
 /evidence/2026-10-11-com-v15/test-raw.txt
 /evidence/2026-10-11-com-v16/test-raw.txt
 /evidence/2026-10-11-com-v17/test-raw.txt
+/evidence/2026-10-11-com-v18/test-raw.txt
 # Accumulated trace; publish only the bounded stability window.
 /evidence/2026-10-11-stability/driver-v5.txt

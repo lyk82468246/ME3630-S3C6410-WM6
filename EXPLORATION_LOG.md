@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-11：V18 部分线路事件，模拟隔离21项通过
+
+首轮实机tick2982819双句柄确认18、AT/ATI4/4、162项FAILURES3 COMPLETE，不称完整通过。COM1事件mask/取消六项通过（wait227ms/cancel17ms、mask0）；COM5最后线路检查时RX_EXIT2993666 error1167，detach2993725，后续CTS拒绝原子性与取消等3项失败。双通知/RX join0。已保存driver-first/test-first，不在测试内重开坏句柄，进行第二次有界独立复测；DLL哈希/语义见COM_V18.md。旧V6/8/10/14/15/16/17/18源码分支和全部PowerShell语法通过。
+
+按用户继续工作，在V17基础上独立V18加入DSR/DCD状态变化事件、RI已知低到高事件，不支持CTS/完整modem查询/流控/PPP。生产通知更新函数在同一端口锁内更新baseline/accepted/tick和pending，第一份状态仅建立基准，坏/重复报文不触发，mask过滤后合并且保留RXCHAR。SetMask代数取消沿用已有语义；通知线程失败清known并唤醒，要求线路事件的等待返回错误，纯RX等待独立；detach仍正常失败，不以未知状态伪造边沿。ring上升沿是明确的受限实现，不声称通用Unimodem兼容。API语义核对微软WaitCommEvent，链接见scripts/COM_V18.md。
+
+line_unit直接复用生产更新/等待函数，通过Joe实际32位RAPI运行模拟通知，无USB/AT：18项初版通过后扩展覆盖，最终tick2946472为21/21，包括等待线程被样本唤醒、RX事件保留、重复拒绝、取消、通知失败隔离、disconnect与引用平衡；仅软件验证，不注入实机驱动。build -Version18编译成功，deploy -Version18安装dll_load1 installed1 error0。新增每端口6项实机mask/取消验证，预期162项，正在等待新实例回归；真实正线路变化/模块重启原因仍未解决。
+
 ## 2026-10-11：V17 严格解析、部分线路状态与日志串行化
 
 最后一次有界复测tick2643684：双句柄实例17、AT/ATI4/4、150项零失败；两snapshot accepted11 rejected0 knownE0 status00 raw00 error0，累计66条解析且同一行多tick为0。首次和第三次完整通过、中间第二次47项掉线级联失败，并非连续通过或长期稳定。全部三次focused证据保留并脱敏发布。源码/首轮/解析器已及时推送2e87b0f，本次追加失败与第三轮证据及记录；模块重启、物理线路变化、标准线路事件/流控/PPP仍未解决。

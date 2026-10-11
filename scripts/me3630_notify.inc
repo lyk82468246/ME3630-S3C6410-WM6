@@ -32,11 +32,16 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
 #ifdef COM_V17
         valid=m36_parse_notify(data,bytes,port->index,&raw,&status);
         EnterCriticalSection(&port->io);
+#ifdef COM_V18
+        m36_update_notify(&port->notifyState,data,bytes,port->index,GetTickCount(),port->eventMask,&port->eventPending);
+        if(port->eventPending&port->eventMask)SetEvent(port->eventWake);
+#else
         if(valid) {
             port->notifyState.raw=raw;port->notifyState.status=status;
             port->notifyState.known=M36_NOTIFY_KNOWN;port->notifyState.accepted++;
             port->notifyState.tick=GetTickCount();port->notifyState.error=0;
         } else port->notifyState.rejected++;
+#endif
         LeaveCriticalSection(&port->io);
         logline(L"V17 NOTIFY_PARSED interface=%lu valid=%lu raw=%02lx status=%02lx\r\n",port->index,valid,valid?raw:0,valid?status:0);
 #endif
@@ -47,6 +52,9 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
 #ifdef COM_V17
     EnterCriticalSection(&port->io);port->notifyState.known=0;
     port->notifyState.error=WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0?ERROR_DEVICE_NOT_CONNECTED:ERROR_IO_DEVICE;
+#ifdef COM_V18
+    SetEvent(port->eventWake);
+#endif
     LeaveCriticalSection(&port->io);
 #endif
     port_release(port);return 0;

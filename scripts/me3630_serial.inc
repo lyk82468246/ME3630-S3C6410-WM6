@@ -154,7 +154,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_V15
 #ifdef COM_V16
 #ifdef COM_V17
+#ifdef COM_V18
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=18;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=17;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
 #else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=16;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif
@@ -187,7 +191,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     case 0x001b0028: /* SetCommMask: only RXCHAR and zero are supported. */
         if(!in || inSize!=sizeof(DWORD))break;
         memcpy(&lines,in,sizeof(DWORD));
+#ifdef COM_V18
+        if(lines&~(EV_RXCHAR|M36_LINE_EVENTS)){error=ERROR_NOT_SUPPORTED;break;}
+#else
         if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
+#endif
         port->eventMask=lines;port->eventEpoch++;port->eventPending=0;
 #ifdef COM_V9
         SetEvent(port->eventWake);

@@ -220,7 +220,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V15
 #ifdef COM_V16
 #ifdef COM_V17
+#ifdef COM_V18
+        wsprintfW(path,L"Drivers\\ME3630ComV18\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV17\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV16\\Port%lu",port->index);
 #endif
@@ -280,7 +284,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V15
 #ifdef COM_V16
 #ifdef COM_V17
+#ifdef COM_V18
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18.dll",sizeof(L"ME3630ComV18.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV17.dll",sizeof(L"ME3630ComV17.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV16.dll",sizeof(L"ME3630ComV16.dll"));
 #endif
@@ -346,7 +354,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V15
 #ifdef COM_V16
 #ifdef COM_V17
+#ifdef COM_V18
+    logline(L"V18 READY duplex=1 queue=4096 line_events=DSR/RLSD/RING CTS=unknown\r\n");
+#else
     logline(L"V17 READY duplex=1 queue=4096 notification_state=partial CTS=unknown\r\n");
+#endif
 #else
     logline(L"V16 READY duplex=1 queue=4096 interrupt_probe=1 modem_status=unsupported\r\n");
 #endif

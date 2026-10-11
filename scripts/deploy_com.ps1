@@ -1,4 +1,4 @@
-param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14,[switch]$Version15,[switch]$Version16,[switch]$Version17)
+param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14,[switch]$Version15,[switch]$Version16,[switch]$Version17,[switch]$Version18)
 $ErrorActionPreference='Stop'
 if([Environment]::Is64BitProcess){throw 'Use 32-bit PowerShell'}
 $source=Get-Content 'C:\Users\Joe\Documents\C#\Positron\scripts\device_gate.ps1' -Raw
@@ -18,6 +18,7 @@ if($Version14){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Versi
 if($Version15){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14){throw 'Select a single version'};$version=15}
 if($Version16){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15){throw 'Select a single version'};$version=16}
 if($Version17){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15 -or $Version16){throw 'Select a single version'};$version=17}
+if($Version18){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15 -or $Version16 -or $Version17){throw 'Select a single version'};$version=18}
 $out=Join-Path $PSScriptRoot "..\evidence\2026-10-11-com-v$version"
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $testLog='\Temp\ME3630-com-test.txt';if($Version5){$testLog='\Temp\ME3630-com-test-v5.txt'}
@@ -33,6 +34,7 @@ if($Version14){$testLog='\Temp\ME3630-com-test-v14.txt'}
 if($Version15){$testLog='\Temp\ME3630-com-test-v15.txt'}
 if($Version16){$testLog='\Temp\ME3630-com-test-v16.txt'}
 if($Version17){$testLog='\Temp\ME3630-com-test-v17.txt'}
+if($Version18){$testLog='\Temp\ME3630-com-test-v18.txt'}
 $previousStart=$null
 try {
  [PositronDeviceRapi]::Connect()
@@ -86,6 +88,7 @@ try {
   if($Version15){$expectedChecks=138}
   if($Version16){$expectedChecks=138}
   if($Version17){$expectedChecks=150}
+  if($Version18){$expectedChecks=162}
   if($Test -and $redacted -notmatch "COMMANDS_PASSED=4/4 CONTROL_CHECKS=$expectedChecks FAILURES=0 COMPLETE"){throw "V$version test did not pass all checks"}
  } elseif($Test){throw 'Test result missing'}
 } finally {[PositronDeviceRapi]::Disconnect()}

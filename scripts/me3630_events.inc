@@ -21,6 +21,9 @@ static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
   else if(port->rxFailure){error=port->rxFailure;done=TRUE;}
 #endif
   else if(epoch!=port->eventEpoch || !port->eventMask){ok=TRUE;done=TRUE;}
+#ifdef COM_V18
+  else if((port->eventMask&M36_LINE_EVENTS) && port->notifyState.error){error=port->notifyState.error;done=TRUE;}
+#endif
   else if(port->eventPending&port->eventMask){mask=port->eventPending&port->eventMask;port->eventPending&=~mask;ok=TRUE;done=TRUE;}
 #ifdef COM_V9
   if(!done)ResetEvent(port->eventWake);

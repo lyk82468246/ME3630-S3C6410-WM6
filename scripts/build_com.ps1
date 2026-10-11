@@ -1,4 +1,4 @@
-param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14,[switch]$Version15,[switch]$Version16,[switch]$Version17)
+param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14,[switch]$Version15,[switch]$Version16,[switch]$Version17,[switch]$Version18)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -19,6 +19,7 @@ if($Version14){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Versi
 if($Version15){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14){throw 'Select a single version'};$version=15;for($n=5;$n -le 15;$n++){$flags+="/DCOM_V$n"}}
 if($Version16){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15){throw 'Select a single version'};$version=16;for($n=5;$n -le 16;$n++){$flags+="/DCOM_V$n"}}
 if($Version17){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15 -or $Version16){throw 'Select a single version'};$version=17;for($n=5;$n -le 17;$n++){$flags+="/DCOM_V$n"}}
+if($Version18){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13 -or $Version14 -or $Version15 -or $Version16 -or $Version17){throw 'Select a single version'};$version=18;for($n=5;$n -le 18;$n++){$flags+="/DCOM_V$n"}}
 if(!$TestsOnly) {
 & $cl @flags /DSTREAM_V3 /DCOM_V4 "/Fo$build\me3630_com_v$version.obj" "/Fe$build\ME3630ComV$version.dll" "$PSScriptRoot\me3630_probe.c" /link /DLL /NODEFAULTLIB /ENTRY:DllMain /SUBSYSTEM:WINDOWSCE,5.02 "/DEF:$PSScriptRoot\me3630_com.def" "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'COM DLL build failed'}

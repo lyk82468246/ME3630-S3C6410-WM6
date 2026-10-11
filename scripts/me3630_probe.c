@@ -61,7 +61,11 @@ static void logline(LPCWSTR format,...)
 #ifdef COM_V16
 #ifdef COM_V17
     EnterCriticalSection(&traceLock);
+#ifdef COM_V18
+    file=CreateFile(L"\\Temp\\ME3630-com-v18.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
     file=CreateFile(L"\\Temp\\ME3630-com-v17.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
 #else
     file=CreateFile(L"\\Temp\\ME3630-com-v16.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 #endif
