@@ -3,6 +3,9 @@
 #include <windows.h>
 #include <usbdi.h>
 #include <stdarg.h>
+#ifdef STREAM_V3
+#include <devload.h>
+#endif
 #undef wsprintf
 #undef wsprintfW
 #undef wvsprintf
@@ -14,6 +17,10 @@ typedef struct {
     HANDLE stop, thread;
     USB_ENDPOINT_DESCRIPTOR in[2], out[2];
     DWORD iface[2], count;
+#ifdef STREAM_V3
+    void *ports[2];
+    LONG refs;
+#endif
 } PROBE;
 
 static void logline(LPCWSTR format,...)
@@ -26,7 +33,11 @@ static void logline(LPCWSTR format,...)
     va_start(args,format);
     n=wvsprintfW(text,format,args);
     va_end(args);
+#ifdef STREAM_V3
+    file=CreateFile(L"\\Temp\\ME3630-stream-v3.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
     file=CreateFile(L"\\Temp\\ME3630-usb-probe.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
     if(file!=INVALID_HANDLE_VALUE) {
         SetFilePointer(file,0,NULL,FILE_END);
         bytes=wsprintfW(stamp,L"[tick=%lu] ",GetTickCount());
@@ -53,6 +64,9 @@ static BOOL wait_transfer(PROBE *p,USB_TRANSFER t,DWORD timeout,LPDWORD bytes)
     return complete && error==USB_NO_ERROR;
 }
 
+#ifdef STREAM_V3
+#include "me3630_stream.inc"
+#else
 static DWORD WINAPI worker(LPVOID param)
 {
     PROBE *p=(PROBE*)param;
@@ -97,6 +111,7 @@ static DWORD WINAPI worker(LPVOID param)
     logline(L"PROBE_COMPLETE\r\n");
     return 0;
 }
+#endif
 
 static BOOL WINAPI detach(LPVOID ctx,DWORD code,LPDWORD *a,LPDWORD *b,LPDWORD *c,LPDWORD *d)
 {
@@ -109,9 +124,14 @@ static BOOL WINAPI detach(LPVOID ctx,DWORD code,LPDWORD *a,LPDWORD *b,LPDWORD *c
     /* Retain context if a host call did not return, avoiding a use-after-free. */
     if(waited==WAIT_OBJECT_0) {
         p->usb->lpUnRegisterNotificationRoutine(p->device,detach,p);
+#ifdef STREAM_V3
+        stream_cleanup(p);
+        probe_release(p);
+#else
         if(p->thread)CloseHandle(p->thread);
         CloseHandle(p->stop);
         LocalFree(p);
+#endif
     }
     return TRUE;
 }
@@ -134,6 +154,9 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
     p=(PROBE*)LocalAlloc(LPTR,sizeof(PROBE));
     if(!p)return FALSE;
     p->device=device;p->usb=usb;
+#ifdef STREAM_V3
+    p->refs=1;
+#endif
     p->stop=CreateEvent(NULL,TRUE,FALSE,NULL);
     if(!p->stop){LocalFree(p);return FALSE;}
     logline(L"CONFIG interfaces=%lu\r\n",config->dwNumInterfaces);

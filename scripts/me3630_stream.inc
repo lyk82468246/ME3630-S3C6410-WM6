@@ -1,0 +1,120 @@
+/* V3 diagnostic stream, NOT a COM/Unimodem implementation.
+ * Device Manager maps stream buffers; USB sees only our local staging buffer.
+ * Single opener per channel; remove signals cancellation before taking I/O lock.
+ * Parent/port refcounts keep an unplugged open handle safe until Close. */
+typedef struct {
+    PROBE *parent;
+    USB_PIPE in,out;
+    HANDLE active;
+    CRITICAL_SECTION io;
+    LONG refs,opened;
+    DWORD index;
+} PORT;
+static void probe_release(PROBE *p)
+{
+    if(InterlockedDecrement(&p->refs)==0) {
+        if(p->thread)CloseHandle(p->thread);
+        CloseHandle(p->stop);LocalFree(p);
+    }
+}
+static void port_release(PORT *port)
+{
+    if(InterlockedDecrement(&port->refs)==0) {
+        PROBE *p=port->parent;
+        DeleteCriticalSection(&port->io);LocalFree(port);probe_release(p);
+    }
+}
+DWORD M36_Init(DWORD context)
+{
+    HKEY key;DWORD ptr=0,size=sizeof(ptr),type;
+    if(RegOpenKeyEx(HKEY_LOCAL_MACHINE,(LPCWSTR)context,0,0,&key)!=ERROR_SUCCESS)return 0;
+    if(RegQueryValueEx(key,L"ClientInfo",NULL,&type,(LPBYTE)&ptr,&size)!=ERROR_SUCCESS || type!=REG_DWORD)ptr=0;
+    RegCloseKey(key);
+    if(ptr)InterlockedIncrement(&((PORT*)ptr)->refs);
+    logline(L"STREAM_INIT ptr=%08lx\r\n",ptr);return ptr;
+}
+BOOL M36_Deinit(DWORD context){port_release((PORT*)context);return TRUE;}
+DWORD M36_Open(DWORD context,DWORD access,DWORD share)
+{
+    PORT *port=(PORT*)context;
+    if(WaitForSingleObject(port->parent->stop,0)==WAIT_OBJECT_0){SetLastError(ERROR_DEVICE_NOT_CONNECTED);return 0;}
+    if(InterlockedCompareExchange(&port->opened,1,0)!=0){SetLastError(ERROR_SHARING_VIOLATION);return 0;}
+    InterlockedIncrement(&port->refs);
+    logline(L"STREAM_OPEN index=%lu access=%08lx\r\n",port->index,access);
+    return context;
+}
+BOOL M36_Close(DWORD context)
+{
+    PORT *port=(PORT*)context;
+    InterlockedExchange(&port->opened,0);port_release(port);return TRUE;
+}
+static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
+{
+    BYTE stage[512];DWORD bytes=0,n;USB_TRANSFER t;BOOL ok;
+    if(!count)return 0;
+    EnterCriticalSection(&port->io);
+    if(WaitForSingleObject(port->parent->stop,0)==WAIT_OBJECT_0 || !port->in || !port->out) {
+        LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return (DWORD)-1;
+    }
+    /* Return a partial operation at 512 bytes; caller must loop for larger writes. */
+    n=count<sizeof(stage)?count:sizeof(stage);
+    if(!input)memcpy(stage,buffer,n);
+    t=port->parent->usb->lpIssueBulkTransfer(input?port->in:port->out,NULL,NULL,
+      USB_NO_WAIT|(input?(USB_IN_TRANSFER|USB_SHORT_TRANSFER_OK):USB_OUT_TRANSFER),n,stage,0);
+    ok=wait_transfer(port->parent,t,3000,&bytes);
+    if(ok && bytes<=n && input)memcpy(buffer,stage,bytes);
+    if(bytes>n)ok=FALSE;
+    LeaveCriticalSection(&port->io);
+    if(!ok){SetLastError(ERROR_IO_DEVICE);return (DWORD)-1;}
+    return bytes;
+}
+DWORD M36_Read(DWORD context,LPVOID buffer,DWORD count){return stream_io((PORT*)context,buffer,count,TRUE);}
+DWORD M36_Write(DWORD context,LPCVOID buffer,DWORD count){return stream_io((PORT*)context,(LPVOID)buffer,count,FALSE);}
+DWORD M36_Seek(DWORD context,LONG distance,DWORD method){SetLastError(ERROR_NOT_SUPPORTED);return (DWORD)-1;}
+BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+{if(actual)*actual=0;SetLastError(ERROR_NOT_SUPPORTED);return FALSE;}
+void M36_PowerUp(DWORD context){}
+void M36_PowerDown(DWORD context){}
+static DWORD WINAPI worker(LPVOID param)
+{
+    PROBE *p=(PROBE*)param;DWORD i,bytes,index,disp;PORT *port;HKEY key;WCHAR path[96];
+    USB_DEVICE_REQUEST request;USB_TRANSFER t;
+    logline(L"V3 WAIT_MODEM_READY 20s\r\n");
+    if(WaitForSingleObject(p->stop,20000)==WAIT_OBJECT_0)return 0;
+    for(i=0;i<p->count;i++) {
+        if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
+        port=(PORT*)LocalAlloc(LPTR,sizeof(PORT));if(!port)continue;
+        port->parent=p;port->refs=1;port->index=p->iface[i];
+        InterlockedIncrement(&p->refs);InitializeCriticalSection(&port->io);p->ports[i]=port;
+        port->in=p->usb->lpOpenPipe(p->device,&p->in[i]);
+        port->out=p->usb->lpOpenPipe(p->device,&p->out[i]);
+        if(!port->in || !port->out){logline(L"V3 PIPE_FAILED interface=%lu\r\n",port->index);continue;}
+        memset(&request,0,sizeof(request));request.bmRequestType=0x21;request.bRequest=0x22;
+        request.wValue=3;request.wIndex=(USHORT)port->index;
+        t=p->usb->lpIssueVendorTransfer(p->device,NULL,NULL,USB_OUT_TRANSFER|USB_NO_WAIT|USB_SEND_TO_INTERFACE,&request,NULL,0);
+        if(!wait_transfer(p,t,1000,&bytes))continue;
+        wsprintfW(path,L"Drivers\\ME3630StreamV3\\Port%lu",port->index);
+        if(RegCreateKeyEx(HKEY_LOCAL_MACHINE,path,0,NULL,0,0,NULL,&key,&disp)!=ERROR_SUCCESS)continue;
+        index=port->index;
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630StreamV3.dll",sizeof(L"ME3630StreamV3.dll"));
+        RegSetValueEx(key,L"Prefix",0,REG_SZ,(LPBYTE)L"M36",sizeof(L"M36"));
+        RegSetValueEx(key,L"Index",0,REG_DWORD,(LPBYTE)&index,sizeof(index));RegCloseKey(key);
+        if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
+        port->active=ActivateDevice(path,(DWORD)port);
+        logline(L"V3 ACTIVATE M36%lu: handle=%08lx error=%lu\r\n",index,(DWORD)port->active,GetLastError());
+    }
+    logline(L"V3 READY\r\n");return 0;
+}
+static void stream_cleanup(PROBE *p)
+{
+    DWORD i;PORT *port;
+    for(i=0;i<p->count;i++) {
+        port=(PORT*)p->ports[i];if(!port)continue;
+        if(port->active && port->active!=INVALID_HANDLE_VALUE)DeactivateDevice(port->active);
+        EnterCriticalSection(&port->io);
+        if(port->in)p->usb->lpClosePipe(port->in);
+        if(port->out)p->usb->lpClosePipe(port->out);
+        port->in=port->out=NULL;LeaveCriticalSection(&port->io);
+        p->ports[i]=NULL;port_release(port);
+    }
+}

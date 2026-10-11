@@ -1,0 +1,14 @@
+EXPORTS
+ USBDeviceAttach
+ USBInstallDriver
+ USBUnInstallDriver
+ M36_Init
+ M36_Deinit
+ M36_Open
+ M36_Close
+ M36_Read
+ M36_Write
+ M36_Seek
+ M36_IOControl
+ M36_PowerUp
+ M36_PowerDown

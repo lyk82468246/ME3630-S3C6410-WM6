@@ -6,6 +6,8 @@
 
 ## 当前结论
 
+- V3 已在实机提供 M361:（AT）、M362:（MODEM）诊断流接口。独立应用通过 CreateFile/WriteFile/ReadFile 对两个接口执行 AT/ATI，4/4 成功，型号/固件正确，各传输 USB 错误0。不是标准 COM 驱动：尚缺串口控制、事件和电源管理。测试过程中发现反复重枚举；短时重置空闲计时器后成功，原因仍需确认。详见 scripts/STREAM_V3.md 和 evidence/2026-10-11-stream-v3/test.txt。
+
 - 自编 CE5.2 USB V2 原型已在 WM6 成功完成 MI1（AT）、MI2（MODEM）的 AT 收发：两个通道都写入3字节、读入6字节并响应 OK，USB错误0。还未实现 COM 接口和 PPP，长期稳定性未验证。源码和日志位于 scripts/me3630_probe.c、evidence/2026-10-11-usb-probe/usb-probe.txt。
 
 - 实机版本：CE 5.2 build 20782。USB Host 的 s3c6410_ohci2.dll 已加载为 HCD1，OHCI PhysicalPageSize 为 256 KiB。

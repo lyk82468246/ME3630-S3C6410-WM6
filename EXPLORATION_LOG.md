@@ -1,5 +1,19 @@
 # 探索记录
 
+## 2026-10-11：V3 应用层双接口 AT/ATI 验证通过
+
+继续开发自编流接口：me3630_probe.c 的 STREAM_V3 条件编译引用 me3630_stream.inc，新增 M36_Init/Open/Read/Write/Close/Deinit 等导出。MI1 映射 M361:，MI2 映射 M362:；暂不用 COM 前缀，避免碰撞原有 LeadCore 串口，也避免将缺少串口 IOCTL 的诊断接口误认为标准串口。通过 ActivateDevice/ClientInfo 传递上下文，独占打开；512 字节本地 USB staging buffer、3 秒有界传输；拔出先发 stop，等待启动线程退出，再注销子设备并关闭 pipe；引用计数保留仍有打开句柄的上下文。拔出时仍打开句柄的行为待实测。
+
+构建使用 VS2008 ARM 编译器 + WM6 SDK，CE5.2/ARM Thumb。通过 Joe 的 32 位 PowerShell/WMDC 安装 ME3630StreamV3.dll，实机 LoadLibrary/注册成功，error=0；保留 V2 DLL，安装失败尝试恢复 V2 注册。用户确认重插并等待。
+
+首轮独立应用测试失败，两个接口 OPEN 返回 error55，COMMANDS_PASSED=0/4。日志显示多次 ATTACH/DETACH，部分在启动等待20秒前断开。首次 M361 激活成功时，MI2 控制请求返回 USB_ERROR5 并断开。不能据此认定驱动ABI不可用或具体硬件故障。
+
+第二轮在测试应用中临时每秒 SystemIdleTimerReset，等待25秒后测试，不修改持久电源策略。tick2710253 开始保持唤醒；tick2710399 ATTACH，tick2730717/2730778 激活 M361/M362；tick2735301/2735406 应用打开成功。两个接口 AT 写3字节、读6字节；ATI 写4字节、读112字节，各 USB error0。均返回 OK、Manufacturer ZTE WELINK、Model ME3630、Revision ME3630C1AV2.0B01；COMMANDS_PASSED=4/4 COMPLETE。实机独立应用的读写缓冲区路径得到验证。
+
+证据：evidence/2026-10-11-stream-v3/install.txt、driver.txt、test-first-attempt.txt、test.txt。原始ATI日志 test-raw.txt留本地且被.gitignore排除，发布版本IMEI脱敏。上传时 DLL SHA256=0ebe068dbcaf18d79839c1129a0d4af14b537baf53bd78aca0464a5b390f3914；后续仅为更新测试EXE重新构建整个项目，DLL代码未变但PE时间戳导致工作目录二进制hash变化，未覆盖实机加载中的DLL。
+
+结论：已经从USB内部原型推进到独立应用可用的双流设备。保持唤醒与成功存在时间相关，尚不足以断定自动休眠导致重枚举；需进一步电源状态与长时间/重复收发、拔出带句柄验证。尚未完成标准 COM IOCTL、DCB、事件、双向缓冲、suspend/resume、Unimodem或PPP，没有拨号。WM6 SDK缺Pegdser.h，不能套用桌面NT串口IOCTL编码。部署测试使用唯一EXE名，避免覆盖设备上锁定的旧映像（曾遇CeMoveFile error5）。
+
 ## 2026-10-11：建立提交与推送流程
 
 用户要求及时推送。已确认 origin=https://github.com/lyk82468246/ME3630-S3C6410-WM6.git，分支main。准备提交自编源码、诊断/原型二进制、探索记录和针对性的实机测试证据。原始第三方驱动包、编译中间文件、完整设备目录和注册表快照保留本地，通过.gitignore排除。后续重要验证里程碑后提交并推送；不强制推送。
