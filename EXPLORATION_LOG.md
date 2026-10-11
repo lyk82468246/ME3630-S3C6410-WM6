@@ -1,5 +1,17 @@
 # 探索记录
 
+## 2026-10-11：V8 RXCHAR 事件子集首次通过
+
+用户要求继续开发。复核先前实机ioctl-abi.txt：GetCommMask001b0024、SetCommMask001b0028、WaitCommEvent001b002c，DWORD缓冲。实现V8独立驱动/注册表/安装器/日志，保留V7回退。新增me3630_events.inc，只支持0/EV_RXCHAR掩码；不支持位明确error50且保留原配置。等待不持配置锁，使用200ms有界USB读片段将数据留在512字节缓冲，事件返回后ReadFile读取；mask generation变化或零掩码成功返回零，拔出/传输失败明确报错，不伪造事件。单等待者限制errorBUSY，等待期间增加端口引用。Close改变掩码代数释放等待。保留V7收发并发及只读ADB诊断。
+
+私有IOCTL00223ffc返回实例版本DWORD8，非标准串口请求；应用对每个实际打开的句柄验证，不符则关闭等待重新枚举，40秒有界。host仍检查新start_tick及READY，解决仅凭旧READY无法证明活动驱动的问题。安装dll_load1 installed1 error0；实际驱动SHA256=a51b4bc2d42e8df87ef71833224a8bd1a3dfcf06fd208af79761cc267f2ef600。
+
+第一轮tick14309370：4/4命令、68/68检查、FAILURES0 COMPLETE。COM1/COM5事件等待212/206ms（含发送前200ms延迟），maskEV_RXCHAR、AT响应均6字节OK；SetCommMask取消调用12/17ms，总等待寿命215/232ms，不将总寿命称为纯取消延迟。首轮test-first-attempt.txt、driver-first-attempt.txt保留。新增12项/端口在原44项上扩展至68。后续仅TestsOnly重编测试，加入重复Wait拒绝和零mask立即返回断言、显式INSTANCE_VERSION日志，复测结果另记；没有重编或覆盖活动DLL。
+
+范围限制：当前等待者持RX锁，是wait-then-read子集；不得并行ReadFile与WaitCommEvent，不读空前次缓冲就再次等待可能阻塞RX至取消/拔出。不是独立后台接收泵或完整串口MDD。仍缺调制解调器状态、CTS/DSR/DCD事件、EV_TXEMPTY、错误状态、purge/队列和PPP；未解析中断端点前不伪造线路状态。持续DETACH/不同boot_id仍出现；未修改供电、SIM、射频、WMDC或LeadCore，也未拨号。源码、局限与微软CE API主来源见scripts/COM_V8.md。
+
+增强第二轮tick14414419：两端口明确记录INSTANCE_VERSION8 bytes4；4/4命令、68/68检查、FAILURES0 COMPLETE。重复等待均被error170拒绝且输出事件0，零掩码等待立即成功返回0。COM1/COM5 RX206/207ms，完整6字节OK；取消调用11/15ms、总等待寿命213/219ms。驱动未重编/覆盖，只更新测试EXE。V6/V7宏编译分支通过/Zs语法检查（无二进制覆盖），部署脚本语法、Git空白及发布日志长标识筛查通过；原始ATI日志仍仅本地。
+
 ## 2026-10-11：V7 同句柄并发收发通过，继续等待重枚举后测试
 
 用户重新拔插模块后授权继续开发，短暂不稳定时等待。通过Joe实际32位WMDC读取V6最新日志（driver.txt增加后续枚举记录，先前版本仍在Git历史中），继续出现uptime重置/不同boot_id，尚无证据说明重启问题消失。本轮不改变供电、SIM、射频、APN或网络配置。

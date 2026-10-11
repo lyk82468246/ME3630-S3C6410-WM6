@@ -11,6 +11,10 @@ typedef struct {
     CRITICAL_SECTION rxIO,txIO;
 #endif
     LONG refs,opened;
+#ifdef COM_V8
+    DWORD eventMask,eventEpoch,eventPending;
+    LONG eventWaiter;
+#endif
     DWORD index;
 #ifdef COM_V4
     DCB dcb;
@@ -61,6 +65,10 @@ DWORD M36_Open(DWORD context,DWORD access,DWORD share)
 BOOL M36_Close(DWORD context)
 {
     PORT *port=(PORT*)context;
+#ifdef COM_V8
+    EnterCriticalSection(&port->io);port->eventMask=0;port->eventPending=0;port->eventEpoch++;
+    LeaveCriticalSection(&port->io);
+#endif
     InterlockedExchange(&port->opened,0);port_release(port);return TRUE;
 }
 static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
@@ -143,7 +151,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V5
 #ifdef COM_V6
 #ifdef COM_V7
+#ifdef COM_V8
+        wsprintfW(path,L"Drivers\\ME3630ComV8\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV7\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV6\\Port%lu",port->index);
 #endif
@@ -163,7 +175,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V5
 #ifdef COM_V6
 #ifdef COM_V7
+#ifdef COM_V8
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV8.dll",sizeof(L"ME3630ComV8.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV7.dll",sizeof(L"ME3630ComV7.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV6.dll",sizeof(L"ME3630ComV6.dll"));
 #endif
@@ -189,7 +205,11 @@ static DWORD WINAPI worker(LPVOID param)
     }
 #ifdef COM_V6
 #ifdef COM_V7
+#ifdef COM_V8
+    logline(L"V8 READY duplex=1 events=RXCHAR\r\n");
+#else
     logline(L"V7 READY duplex=1\r\n");
+#endif
 #else
     logline(L"V6 READY\r\n");
 #endif

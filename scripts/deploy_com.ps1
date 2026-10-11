@@ -1,4 +1,4 @@
-param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7)
+param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8)
 $ErrorActionPreference='Stop'
 if([Environment]::Is64BitProcess){throw 'Use 32-bit PowerShell'}
 $source=Get-Content 'C:\Users\Joe\Documents\C#\Positron\scripts\device_gate.ps1' -Raw
@@ -8,26 +8,28 @@ Add-Type -TypeDefinition $match.Groups[1].Value
 $version=4;if($Version5){$version=5}
 if($Version6){if($Version5){throw 'Select a single version'};$version=6}
 if($Version7){if($Version5 -or $Version6){throw 'Select a single version'};$version=7}
+if($Version8){if($Version5 -or $Version6 -or $Version7){throw 'Select a single version'};$version=8}
 $out=Join-Path $PSScriptRoot "..\evidence\2026-10-11-com-v$version"
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $testLog='\Temp\ME3630-com-test.txt';if($Version5){$testLog='\Temp\ME3630-com-test-v5.txt'}
 if($Version6){$testLog='\Temp\ME3630-com-test-v6.txt'}
 if($Version7){$testLog='\Temp\ME3630-com-test-v7.txt'}
+if($Version8){$testLog='\Temp\ME3630-com-test-v8.txt'}
 $previousStart=$null
 try {
  [PositronDeviceRapi]::Connect()
  if($Test) {
-  if($Version7) {
+  if($Version7 -or $Version8) {
    # Registration does not replace an already active V6 instance. Wait for an
    # actual V7 activation marker, not merely a successful installer return.
    $readyDeadline=[DateTime]::UtcNow.AddSeconds(40);$ready=$false
    do {
     if([PositronDeviceRapi]::TryCopyFileFromDevice("\Temp\ME3630-com-v$version.txt","$out\driver.txt")) {
-     $ready=(Get-Content "$out\driver.txt" -Encoding Unicode -Raw) -match 'V7 READY duplex=1'
+     $ready=(Get-Content "$out\driver.txt" -Encoding Unicode -Raw) -match "V$version READY"
     }
     if(!$ready){Start-Sleep -Seconds 2}
    } while(!$ready -and [DateTime]::UtcNow -lt $readyDeadline)
-   if(!$ready){throw 'V7 has not activated yet; no test launched'}
+   if(!$ready){throw "V$version has not activated yet; no test launched"}
   }
   if([PositronDeviceRapi]::TryCopyFileFromDevice($testLog,"$out\test-raw.txt")) {
    $prior=[regex]::Match((Get-Content "$out\test-raw.txt" -Encoding Unicode -Raw),'start_tick=(\d+)')
@@ -56,6 +58,7 @@ try {
    if(!$current.Success -or ($null -ne $previousStart -and $current.Groups[1].Value -eq $previousStart)){throw 'No fresh test start; refusing to accept old results'}
   }
   $expectedChecks=32;if($Version7){$expectedChecks=44}
+  if($Version8){$expectedChecks=68}
   if($Test -and $redacted -notmatch "COMMANDS_PASSED=4/4 CONTROL_CHECKS=$expectedChecks FAILURES=0 COMPLETE"){throw "V$version test did not pass all checks"}
  } elseif($Test){throw 'Test result missing'}
 } finally {[PositronDeviceRapi]::Disconnect()}

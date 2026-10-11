@@ -68,7 +68,12 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
         if(input) {
             port->rxPos=port->rxLen=0;
             result=serial_transfer(port,port->in,port->rx,sizeof(port->rx),TRUE,limit-n,&bytes);
-            if(result==1)port->rxLen=bytes;
+            if(result==1){
+                port->rxLen=bytes;
+#ifdef COM_V8
+                if(bytes){EnterCriticalSection(&port->io);port->eventPending|=port->eventMask&EV_RXCHAR;LeaveCriticalSection(&port->io);}
+#endif
+            }
         } else {
             bytes=count-total;if(bytes>sizeof(stage))bytes=sizeof(stage);
             memcpy(stage,(PBYTE)buffer+total,bytes);
@@ -92,14 +97,32 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #endif
     SetLastError(0);return total;
 }
+#ifdef COM_V8
+#include "me3630_events.inc"
+#endif
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
     BOOL ok=FALSE;DWORD error=ERROR_INVALID_PARAMETER,lines;DCB dcb;COMMTIMEOUTS timeouts;
     if(actual)*actual=0;
+#ifdef COM_V8
+    /* Wait must not hold the configuration lock: SetCommMask cancels it. */
+    if(code==0x001b002c)return serial_wait_event(port,out,outSize,actual);
+#endif
     EnterCriticalSection(&port->io);
     if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return FALSE;}
     logline(L"V4 IOCTL code=%08lx in=%lu out=%lu\r\n",code,inSize,outSize);
     switch(code) {
+#ifdef COM_V8
+    case 0x00223ffc: /* Private version query, not a CE serial IOCTL. */
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=8;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+    case 0x001b0024: /* GetCommMask, measured on this ROM. */
+        if(out && outSize>=sizeof(DWORD)){memcpy(out,&port->eventMask,sizeof(DWORD));if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+    case 0x001b0028: /* SetCommMask: only RXCHAR and zero are supported. */
+        if(!in || inSize!=sizeof(DWORD))break;
+        memcpy(&lines,in,sizeof(DWORD));
+        if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
+        port->eventMask=lines;port->eventEpoch++;port->eventPending=0;ok=TRUE;break;
+#endif
     case 0x001b0050: /* GetCommState */
         if(out && outSize>=sizeof(DCB)){memcpy(out,&port->dcb,sizeof(DCB));if(actual)*actual=sizeof(DCB);ok=TRUE;}break;
     case 0x001b0054: /* SetCommState: validate before changing physical control lines. */
