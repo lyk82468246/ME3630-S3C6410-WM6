@@ -54,3 +54,13 @@ DETACH2993725, both notification and RX joins wait0. CTS-mask atomicity and
 subsequent cancellation checks fail on the removed handle. First outputs
 are retained as driver-first/test-first; the device was not reset or manually
 reopened within the failed tests. A second bounded fresh test follows.
+
+Second fresh test tick3065370: both handles verify18, AT/ATI4/4 CHECKS162
+FAILURES0 COMPLETE. Both line masks roundtrip, atomic CTS rejection and
+cancellation pass; waits225/219ms with cancellation calls17/16ms and result0.
+COM1/COM5 accepted notification counts11/10, rejected0, knownE0/status00/
+raw00/error0. Final cumulative trace has no multiple-tick line collisions.
+Thus one disconnect-interrupted failure and one complete passing window,
+not consecutive success or long-term stability. No positive physical line
+edge occurred. Sources/unit/first evidence were pushed as4a1eaab; this
+follow-up publishes the second test and accurately retains the first failure.

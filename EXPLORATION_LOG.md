@@ -2,6 +2,8 @@
 
 ## 2026-10-11：V18 部分线路事件，模拟隔离21项通过
 
+第二轮新进程tick3065370双句柄确认18、AT/ATI4/4、162项零失败。两端口line mask/CTS原子拒绝/取消均通过，等待225/219ms、取消调用17/16ms、mask0；notification accepted11/10 rejected0 knownE0 status00 raw00 error0，累计日志同一行多tick0。一个掉线中断失败、一个完整通过窗口，不称连续通过或长期稳定；真实正线路边沿未出现。源码/模拟21项/首轮失败已及时推送4a1eaab，追加第二轮聚焦脱敏证据和记录；保持原接线供电，无拨号/RF/APN/SIM改动。
+
 首轮实机tick2982819双句柄确认18、AT/ATI4/4、162项FAILURES3 COMPLETE，不称完整通过。COM1事件mask/取消六项通过（wait227ms/cancel17ms、mask0）；COM5最后线路检查时RX_EXIT2993666 error1167，detach2993725，后续CTS拒绝原子性与取消等3项失败。双通知/RX join0。已保存driver-first/test-first，不在测试内重开坏句柄，进行第二次有界独立复测；DLL哈希/语义见COM_V18.md。旧V6/8/10/14/15/16/17/18源码分支和全部PowerShell语法通过。
 
 按用户继续工作，在V17基础上独立V18加入DSR/DCD状态变化事件、RI已知低到高事件，不支持CTS/完整modem查询/流控/PPP。生产通知更新函数在同一端口锁内更新baseline/accepted/tick和pending，第一份状态仅建立基准，坏/重复报文不触发，mask过滤后合并且保留RXCHAR。SetMask代数取消沿用已有语义；通知线程失败清known并唤醒，要求线路事件的等待返回错误，纯RX等待独立；detach仍正常失败，不以未知状态伪造边沿。ring上升沿是明确的受限实现，不声称通用Unimodem兼容。API语义核对微软WaitCommEvent，链接见scripts/COM_V18.md。
