@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-11：D33实机定位零访问辅助打开，D34修复后推进到配置接口
+
+用户同意后软重启进程2343937746。首次保存连接测试48172在启动窗口等30秒仍无端口，保留失败；第二轮109053确认V18并实际拨号633。D33日志109333正常数据打开、109364 access0且opened1，被原独占检查拒绝，109381数据Close；这是实际触发点之一，不是全部633根因。独立每Open上下文实现于me3630_open.inc，数据仍独占，元数据不占数据所有权，关闭元数据不清事件或释放数据owner；禁止其读写与变更控制。生产helper原生15/15单元三轮316439、364660、452564通过，非USB/并发脱离全覆盖。
+
+D34安装318773成功；自然重枚举实际激活，首测392098 private34，数据和access0均ok，推进到Get/SetCommState/Timeouts/Mask/Purge调用，仍633。新构建补Open错误码跨日志保留时，复制同名已加载DLL失败device32，没有强制卸载；通过RAPI回取实际首版并保留deployed-first.dll/hash。改用独立D34R2名安装454879成功，private3402确认后499066拨号，512436完成633，无PPP。记录实测初始DCB19200 flags2015拒绝、fallback115200 flags1011成功；Timeouts50/1/50/5/500、mask1f9、purge0c均不支持(error50)。双Close正确，之后519090才DETACH，不能把配置失败都归因于掉线。
+
+三轮独立测试、D34/D34R2/原V18分支构建通过；未放宽未知接口，未再未经授权重启，未改变保存连接/LeadCore/WMDC。证据diag33/driver-open-block/dial-633，diag34/dial-first/open-unit/实际DLL，diag34R2/dial/driver-parameters/open-unit/install。细节、哈希及下一步见scripts/DIAG34.md。下步按实测参数补超时、双FIFO清空和事件订阅兼容，尚不能称633已解决或联网成功。
+
 ## 2026-10-11：TAPI辨识成功，安装只增强日志的V18 D33变体
 
 继续定位633，不以猜测占用/缺某IOCTL直接修改成功语义。ras_saved inspect增加限定ME3630名称的lineInitializeEx/lineGetDevCaps/lineGetDevConfig/lineOpen MONITOR/lineGetID portname，最后关闭监视并shutdown；不拨号、不修改配置、不读凭据。tick329898实测TAPI总返回9、自己的line8 ME3630 Test COM5，media10/DATAMODEM、features8、caps1e0；config684、monitor open0；portname查询80000048为LINEERR_OPERATIONFAILED。保存连接仍唯一正确。不能用监视打开成功证明实际COM5健康，也不能从portname失败单独解释633。

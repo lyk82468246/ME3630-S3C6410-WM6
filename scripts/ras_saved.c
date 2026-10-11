@@ -88,6 +88,7 @@ void mainCRTStartup(void)
  if(port==INVALID_HANDLE_VALUE){emit(L"PORT_UNAVAILABLE error=%lu\r\n",GetLastError());goto finish;}
  version=actual=0;
  if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,4,&actual,NULL) || version!=18 || actual!=4){CloseHandle(port);emit(L"PORT_IDENTITY_REJECTED version=%lu bytes=%lu\r\n",version,actual);goto finish;}
+ {DWORD diagnostic=0,diagBytes=0;if(DeviceIoControl(port,0x00223ff4,NULL,0,&diagnostic,4,&diagBytes,NULL) && diagBytes==4)emit(L"PORT_DIAGNOSTIC build=%lu\r\n",diagnostic);}
  CloseHandle(port);emit(L"PORT_VERIFIED version=%lu\r\n",version);
  memset(&params,0,sizeof(params));params.dwSize=sizeof(params);lstrcpyW(params.szEntryName,selected);
  memset(&wc,0,sizeof(wc));wc.lpfnWndProc=notify;wc.hInstance=GetModuleHandle(NULL);wc.lpszClassName=L"ME3630RasNotify";

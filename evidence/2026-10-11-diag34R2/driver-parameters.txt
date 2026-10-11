@@ -1,0 +1,15 @@
+Focused observations from private diagnostic identity3402, saved RAS attempt499066.
+Data open and zero-access companion open both succeeded.
+GetCommState succeeded.
+[tick=508623] D34R2 DCB length=28 baud=19200 flags=00002015 byte=8 parity=0 stop=0
+[tick=508694] D34R2 TIMEOUTS interval=50 r_mult=1 r_const=50 w_mult=5 w_const=500
+[tick=508810] D34R2 DCB length=28 baud=115200 flags=00001011 byte=8 parity=0 stop=0
+[tick=508913] D34R2 VALUE code=001b0028 value=000001f9
+[tick=510973] D34R2 VALUE code=001b0044 value=0000000c
+[tick=511012] D33 IO_RETURN port=2 code=001b0044 ok=0 error=50
+[tick=511369] D33 CLOSE port=2 pid=236593102 opened=1 refs=6
+[tick=511385] D34 CLOSE_METADATA port=2 opened=0
+Initial DCB, timeouts, mask and combined TX/RX clear were rejected with error50.
+The fallback115200 DCB succeeded; DTR changes also succeeded.
+Saved attempt completed512436 with633 and no PPP IP.
+USB detached519090 after that failure; do not equate all configuration failures to detach.

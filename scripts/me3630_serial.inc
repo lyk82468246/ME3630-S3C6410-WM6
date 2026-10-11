@@ -129,6 +129,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     BOOL ok=FALSE;DWORD error=ERROR_INVALID_PARAMETER,lines;DCB dcb;COMMTIMEOUTS timeouts;
 #ifdef COM_DIAG33
     logline(L"D33 IO_ENTER port=%lu pid=%lu code=%08lx in=%lu out=%lu\r\n",port->index,GetCurrentProcessId(),code,inSize,outSize);
+#ifdef COM_DIAG34R2
+    if(in && inSize==4 && (code==0x001b0028 || code==0x001b0044)){DWORD value;memcpy(&value,in,4);logline(L"D34R2 VALUE code=%08lx value=%08lx\r\n",code,value);}
+    if(in && inSize==sizeof(DCB) && code==0x001b0054){DCB value;DWORD flags;memcpy(&value,in,sizeof(value));memcpy(&flags,in+8,4);logline(L"D34R2 DCB length=%lu baud=%lu flags=%08lx byte=%lu parity=%lu stop=%lu\r\n",value.DCBlength,value.BaudRate,flags,value.ByteSize,value.Parity,value.StopBits);}
+    if(in && inSize==sizeof(COMMTIMEOUTS) && code==0x001b003c){COMMTIMEOUTS t;memcpy(&t,in,sizeof(t));logline(L"D34R2 TIMEOUTS interval=%lu r_mult=%lu r_const=%lu w_mult=%lu w_const=%lu\r\n",t.ReadIntervalTimeout,t.ReadTotalTimeoutMultiplier,t.ReadTotalTimeoutConstant,t.WriteTotalTimeoutMultiplier,t.WriteTotalTimeoutConstant);}
+#endif
 #endif
     if(actual)*actual=0;
 #ifdef COM_V8
@@ -139,6 +144,16 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return FALSE;}
     logline(L"V4 IOCTL code=%08lx in=%lu out=%lu\r\n",code,inSize,outSize);
     switch(code) {
+#ifdef COM_DIAG34
+    case 0x00223ff4:
+        if(!inSize && out && outSize==4){
+#ifdef COM_DIAG34R2
+            *(DWORD*)out=3402;
+#else
+            *(DWORD*)out=34;
+#endif
+            if(actual)*actual=4;ok=TRUE;}break;
+#endif
 #ifdef COM_V17
     case M36_NOTIFY_QUERY: /* Partial state with explicit validity, NOT a modem IOCTL. */
         if(!inSize && out && outSize==sizeof(M36_NOTIFY_STATE)) {

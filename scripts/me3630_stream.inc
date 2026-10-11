@@ -86,6 +86,9 @@ DWORD M36_Init(DWORD context)
     logline(L"STREAM_INIT ptr=%08lx\r\n",ptr);return ptr;
 }
 BOOL M36_Deinit(DWORD context){port_release((PORT*)context);return TRUE;}
+#ifdef COM_DIAG34
+#include "me3630_open.inc"
+#endif
 DWORD M36_Open(DWORD context,DWORD access,DWORD share)
 {
     PORT *port=(PORT*)context;
@@ -93,14 +96,28 @@ DWORD M36_Open(DWORD context,DWORD access,DWORD share)
     logline(L"D33 OPEN_ENTER port=%lu pid=%lu access=%08lx share=%08lx opened=%ld\r\n",port->index,GetCurrentProcessId(),access,share,port->opened);
 #endif
     if(WaitForSingleObject(port->parent->stop,0)==WAIT_OBJECT_0){SetLastError(ERROR_DEVICE_NOT_CONNECTED);return 0;}
+#ifdef COM_DIAG34
+    {
+        M36_OPEN *open=m36_open_new(port,access);
+        DWORD error=open?0:GetLastError();
+        logline(L"D34 OPEN_RESULT port=%lu access=%08lx ok=%lu error=%lu\r\n",port->index,access,open!=NULL,error);SetLastError(error);
+        return (DWORD)open;
+    }
+#else
     if(InterlockedCompareExchange(&port->opened,1,0)!=0){SetLastError(ERROR_SHARING_VIOLATION);return 0;}
     InterlockedIncrement(&port->refs);
     logline(L"STREAM_OPEN index=%lu access=%08lx\r\n",port->index,access);
     return context;
+#endif
 }
 BOOL M36_Close(DWORD context)
 {
+#ifdef COM_DIAG34
+    M36_OPEN *open=(M36_OPEN*)context;PORT *port=open->port;
+    if(!open->ownsData){logline(L"D34 CLOSE_METADATA port=%lu opened=%ld\r\n",port->index,port->opened);m36_open_release(open);return TRUE;}
+#else
     PORT *port=(PORT*)context;
+#endif
 #ifdef COM_DIAG33
     logline(L"D33 CLOSE port=%lu pid=%lu opened=%ld refs=%ld\r\n",port->index,GetCurrentProcessId(),port->opened,port->refs);
 #endif
@@ -111,7 +128,11 @@ BOOL M36_Close(DWORD context)
 #endif
     LeaveCriticalSection(&port->io);
 #endif
+#ifdef COM_DIAG34
+    m36_open_release(open);return TRUE;
+#else
     InterlockedExchange(&port->opened,0);port_release(port);return TRUE;
+#endif
 }
 static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
@@ -137,12 +158,28 @@ static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     return bytes;
 #endif
 }
-DWORD M36_Read(DWORD context,LPVOID buffer,DWORD count){return stream_io((PORT*)context,buffer,count,TRUE);}
-DWORD M36_Write(DWORD context,LPCVOID buffer,DWORD count){return stream_io((PORT*)context,(LPVOID)buffer,count,FALSE);}
+DWORD M36_Read(DWORD context,LPVOID buffer,DWORD count){
+#ifdef COM_DIAG34
+ M36_OPEN *open=(M36_OPEN*)context;if(!(open->access&GENERIC_READ)){SetLastError(ERROR_ACCESS_DENIED);return (DWORD)-1;}return stream_io(open->port,buffer,count,TRUE);
+#else
+ return stream_io((PORT*)context,buffer,count,TRUE);
+#endif
+}
+DWORD M36_Write(DWORD context,LPCVOID buffer,DWORD count){
+#ifdef COM_DIAG34
+ M36_OPEN *open=(M36_OPEN*)context;if(!(open->access&GENERIC_WRITE)){SetLastError(ERROR_ACCESS_DENIED);return (DWORD)-1;}return stream_io(open->port,(LPVOID)buffer,count,FALSE);
+#else
+ return stream_io((PORT*)context,(LPVOID)buffer,count,FALSE);
+#endif
+}
 DWORD M36_Seek(DWORD context,LONG distance,DWORD method){SetLastError(ERROR_NOT_SUPPORTED);return (DWORD)-1;}
 BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 #ifdef COM_V4
+#ifdef COM_DIAG34
+{M36_OPEN *open=(M36_OPEN*)context;if(!m36_open_allows_control(open,code)){if(actual)*actual=0;SetLastError(ERROR_ACCESS_DENIED);return FALSE;}return serial_control(open->port,code,in,inSize,out,outSize,actual);}
+#else
 {return serial_control((PORT*)context,code,in,inSize,out,outSize,actual);}
+#endif
 #else
 {if(actual)*actual=0;SetLastError(ERROR_NOT_SUPPORTED);return FALSE;}
 #endif
@@ -292,7 +329,15 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V17
 #ifdef COM_V18
 #ifdef COM_DIAG33
+#ifdef COM_DIAG34
+#ifdef COM_DIAG34R2
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D34R2.dll",sizeof(L"ME3630ComV18D34R2.dll"));
+#else
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D34.dll",sizeof(L"ME3630ComV18D34.dll"));
+#endif
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D33.dll",sizeof(L"ME3630ComV18D33.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18.dll",sizeof(L"ME3630ComV18.dll"));
 #endif

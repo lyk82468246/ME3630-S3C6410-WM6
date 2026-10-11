@@ -1,0 +1,10 @@
+Focused D33 trace after user-approved soft reset.
+[tick=109117] D33 OPEN_ENTER port=2 pid=236593102 access=c0000000 share=00000000 opened=0
+[tick=109149] D33 IO_ENTER port=2 pid=236593102 code=00223ffc in=0 out=4
+[tick=109189] D33 IO_RETURN port=2 code=00223ffc ok=1 error=0
+[tick=109205] D33 CLOSE port=2 pid=236593102 opened=1 refs=5
+[tick=109333] D33 OPEN_ENTER port=2 pid=236593102 access=c0000000 share=00000000 opened=0
+[tick=109364] D33 OPEN_ENTER port=2 pid=236593102 access=00000000 share=00000000 opened=1
+[tick=109381] D33 CLOSE port=2 pid=236593102 opened=1 refs=5
+The second, zero-access open reached the driver's exclusive-open rejection.
+The application received633. This is one blocking condition, not the sole remaining issue.
