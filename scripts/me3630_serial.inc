@@ -168,6 +168,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #ifdef COM_DIAG35
 #include "me3630_purge.inc"
 #endif
+#ifdef COM_DIAG36
+#include "me3630_mask.inc"
+#endif
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
     BOOL ok=FALSE;DWORD error=ERROR_INVALID_PARAMETER,lines;DCB dcb;COMMTIMEOUTS timeouts;
@@ -191,7 +194,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG35
+#ifdef COM_DIAG36
+            *(DWORD*)out=36;
+#elif defined(COM_DIAG35)
             *(DWORD*)out=35;
 #elif defined(COM_DIAG34R2)
             *(DWORD*)out=3402;
@@ -264,11 +269,17 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #else
         if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
 #endif
+#ifdef COM_DIAG36
+        ok=m36_set_event_mask(port,lines);
+        logline(L"D36 MASK port=%lu mask=%08lx pending=%08lx queued=%lu epoch=%lu\r\n",port->index,lines,port->eventPending,port->qCount,port->eventEpoch);
+        break;
+#else
         port->eventMask=lines;port->eventEpoch++;port->eventPending=0;
 #ifdef COM_V9
         SetEvent(port->eventWake);
 #endif
         ok=TRUE;break;
+#endif
 #endif
 #ifdef COM_V15
     case 0x001b0030: /* Measured ABI: DWORD errors + 12-byte COMSTAT. */

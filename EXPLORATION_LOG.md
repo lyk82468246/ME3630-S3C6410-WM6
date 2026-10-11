@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-11：授权软重启后D35实机推进到AT，定位事件丢失并安装D36
+
+用户“可以”明确授权一次WM6软重启，run_softreset进程2331890758发出，未清数据或重启PC。首轮WMDC重连30秒超时，第二轮进程3418823510启动、tick56785；期间WMDC再次丢失，收集期限内仅不完整标记，没有误判成功。用户手动恢复后新增只读collect_saved_result，按原开始56785核验取回86996完整结束、elapsed30211、COM5 unavailable55且未RasDial，reset请求文件亦取回。Windows只读检查曾见WcesComm/RapiMgr停止，稍后自行Running；没有改服务或再次重启。随后实机245300 ATTACH，250755/250876 COM1/5激活，Active2。
+
+新保存连接测试273324 private35确证，RasDial0，283920完成633/connected0/elapsed10596，无PPP。此前不支持的timeouts50/1/50/5/500、mask1f9、purge0c均成功，data/access0双Open成功；已出现AT三字节写和六字节响应读取，不记录响应内容或称已拨出数据号。最终279123写AT、279142六字节push先于279178再次设置同mask，D35源码无条件eventPending=0清掉历史RXCHAR；279231等待后不再读取，283071 mask0/双Close，287253才detach。结合时序/源码定位具体丢事件，不归因所有633为该问题。聚焦证据diag35/dial-active633、driver-event-race，完整累计日志只本地。
+
+据微软官方serial sample waitmask.c保持HistoryMask&newMask的语义，D36生产helper仅保留仍订阅的待事件，过滤移除项、推进取消epoch并唤醒；不因未读FIFO凭空重造已消费事件。15所有权(408830)+33兼容/事件(411076)零失败，7新增测试覆盖保留/实际wait交付/不重放/过滤/zero/无效原子拒绝/同mask取消。隔离假端口不是USB并发全覆盖。独立D36安装412364 result0，仅既有精确匹配更换，不强卸载/不额外重启，private36身份必要。哈希和主资料见scripts/DIAG36.md。安装后430651..460871尝试COM5 absent55未RasDial；用户再次拔插等30秒，535531..565803 elapsed30272仍55。Active0、匹配D36且无新ATTACH，累计日志止287355；没有private36实机成功证据，不称修复已使633消失。证据diag36/dial-before-replug、dial-after-replug、state-summary。按要求记录推送，需要另一次软重启许可才继续恢复实机验证。
+
 ## 2026-10-11：D35补实测超时、清空及事件订阅，41项隔离测试通过并安装
 
 依据D34R2实测参数50/1/50/5/500、mask1f9、purge0c，新增COM_DIAG35条件分支，保留D34每Open上下文。读总超时按请求长度计算，支持字节间隔/立即/首字节模式及0/0取消总截止，写总超时亦计算乘数；配置有界且拒绝预算溢出。RXCLEAR清主机FIFO，TXCLEAR增加代次并在实际USB提交锁内复核，不能撤回已提交USB数据；TXABORT仍整请求原子拒绝。BREAK/ERR按有效CDC通知映射、累计ClearCommError，CTS订阅仅被动接受，不伪造未知CTS状态或边沿，硬件CTS流控仍拒绝；TXEMPTY/RXFLAG不支持，DCB兼容范围未改变。细节及主资料见scripts/DIAG35.md，不宣称完整串口兼容。

@@ -63,6 +63,12 @@ allowing natural next attachment; registry changes do not unload active code.
 
 ## Primary references
 
+Later user-approved WM6 reset allowed actual private35 test273324..283920.
+Measured timeout/mask/purge now succeed and AT-size transfers get responses,
+but RAS still633, no PPP. See diag35/dial-active633.txt and
+driver-event-race.txt plus DIAG36.md for the newly identified pending-event
+loss and next isolated fix. The earlier absent-port results remain preserved.
+
 - CE COMMTIMEOUTS: https://learn.microsoft.com/en-us/previous-versions/ms938944(v=msdn.10)
 - CE SetCommMask: https://learn.microsoft.com/en-us/previous-versions/ms912823(v=msdn.10)
 - PurgeComm: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-purgecomm

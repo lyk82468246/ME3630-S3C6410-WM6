@@ -1,0 +1,7 @@
+Own exact USB19d2:1432 match installed as ME3630ComV18D36.dll.
+Read-only post-replug Active probe: ACTIVE_ME3630_PORT_BLOCKS=0.
+Last accumulated trace: DETACH287253, joins completed by287355.
+No subsequent ATTACH after installation/replug in collected trace.
+Real private identity36 has not been observed.
+No new RasDial called in either D36-targeted bounded test.
+Full registry inventories and accumulated driver trace remain local.

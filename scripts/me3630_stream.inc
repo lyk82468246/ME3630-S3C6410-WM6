@@ -335,7 +335,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG34
 #ifdef COM_DIAG34R2
 #ifdef COM_DIAG35
+#ifdef COM_DIAG36
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D36.dll",sizeof(L"ME3630ComV18D36.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D35.dll",sizeof(L"ME3630ComV18D35.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D34R2.dll",sizeof(L"ME3630ComV18D34R2.dll"));
 #endif

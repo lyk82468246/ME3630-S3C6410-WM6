@@ -1,0 +1,29 @@
+Focused excerpt from driver-local.txt collected after actual private build35 dial.
+No serial payload, module identifier or full device inventory included.
+
+[tick=273836] D33 IO_ENTER port=2 pid=3457818574 code=001b003c in=20 out=0
+[tick=273852] D34R2 TIMEOUTS interval=50 r_mult=1 r_const=50 w_mult=5 w_const=500
+[tick=273885] D33 IO_RETURN port=2 code=001b003c ok=1 error=0
+[tick=274066] D34R2 VALUE code=001b0028 value=000001f9
+[tick=274102] D33 IO_RETURN port=2 code=001b0028 ok=1 error=0
+[tick=274896] D34R2 VALUE code=001b0044 value=0000000c
+[tick=274933] D33 IO_RETURN port=2 code=001b0044 ok=1 error=0
+[tick=275623] Q_TX port=2 tid=1800326942 size=3 expected_AT=1 phase=2 cycles=5 timeouts=4
+[tick=275762] Q_PUSH port=2 tid=1309530446 ptr=00e59960 bytes=6 queued=6
+[tick=275828] Q_POP port=2 tid=1800326942 ptr=00e59960 bytes=6 queued=0
+[tick=275843] Q_READ_END port=2 tid=1800326942 bytes=6 elapsed=65 error=0
+[tick=279123] Q_TX port=2 tid=1800326942 size=3 expected_AT=1 phase=2 cycles=9 timeouts=4
+[tick=279142] Q_PUSH port=2 tid=1309530446 ptr=00e59960 bytes=6 queued=6
+[tick=279161] D33 IO_ENTER port=2 pid=3457818574 code=001b0028 in=4 out=0
+[tick=279178] D34R2 VALUE code=001b0028 value=000001f9
+[tick=279213] D33 IO_RETURN port=2 code=001b0028 ok=1 error=0
+[tick=279231] D33 IO_ENTER port=2 pid=3457818574 code=001b002c in=0 out=4
+[tick=283071] D34R2 VALUE code=001b0028 value=00000000
+[tick=283123] D33 CLOSE port=2 pid=3457818574 opened=1 refs=6
+[tick=283139] D34 CLOSE_METADATA port=2 opened=0
+[tick=287253] DETACH wait=0
+
+Inference from timing + production D35 source:
+SetCommMask unconditionally eventPending=0 discarded the RXCHAR latched
+before the repeated same mask; wait then lacked the already-arrived event.
+This explains a concrete observed stall, not every possible RAS633 cause.
