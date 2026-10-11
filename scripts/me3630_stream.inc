@@ -7,6 +7,9 @@ typedef struct {
     USB_PIPE in,out;
     HANDLE active;
     CRITICAL_SECTION io;
+#ifdef COM_V7
+    CRITICAL_SECTION rxIO,txIO;
+#endif
     LONG refs,opened;
     DWORD index;
 #ifdef COM_V4
@@ -27,6 +30,9 @@ static void port_release(PORT *port)
 {
     if(InterlockedDecrement(&port->refs)==0) {
         PROBE *p=port->parent;
+#ifdef COM_V7
+        DeleteCriticalSection(&port->rxIO);DeleteCriticalSection(&port->txIO);
+#endif
         DeleteCriticalSection(&port->io);LocalFree(port);probe_release(p);
     }
 }
@@ -117,6 +123,9 @@ static DWORD WINAPI worker(LPVOID param)
         port=(PORT*)LocalAlloc(LPTR,sizeof(PORT));if(!port)continue;
         port->parent=p;port->refs=1;port->index=p->iface[i];
         InterlockedIncrement(&p->refs);InitializeCriticalSection(&port->io);p->ports[i]=port;
+#ifdef COM_V7
+        InitializeCriticalSection(&port->rxIO);InitializeCriticalSection(&port->txIO);
+#endif
 #ifdef COM_V4
         port->lines=3;port->dcb.DCBlength=sizeof(DCB);port->dcb.BaudRate=115200;port->dcb.ByteSize=8;port->dcb.fBinary=TRUE;
         port->dcb.fDtrControl=DTR_CONTROL_ENABLE;port->dcb.fRtsControl=RTS_CONTROL_ENABLE;
@@ -133,7 +142,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V4
 #ifdef COM_V5
 #ifdef COM_V6
+#ifdef COM_V7
+        wsprintfW(path,L"Drivers\\ME3630ComV7\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV6\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV5\\Port%lu",port->index);
 #endif
@@ -149,7 +162,11 @@ static DWORD WINAPI worker(LPVOID param)
         index=port->index==1?1:5;
 #ifdef COM_V5
 #ifdef COM_V6
+#ifdef COM_V7
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV7.dll",sizeof(L"ME3630ComV7.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV6.dll",sizeof(L"ME3630ComV6.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV5.dll",sizeof(L"ME3630ComV5.dll"));
 #endif
@@ -171,7 +188,11 @@ static DWORD WINAPI worker(LPVOID param)
 #endif
     }
 #ifdef COM_V6
+#ifdef COM_V7
+    logline(L"V7 READY duplex=1\r\n");
+#else
     logline(L"V6 READY\r\n");
+#endif
     adb_boot_probe(p);
 #elif defined(COM_V5)
     logline(L"V5 READY\r\n");
@@ -188,10 +209,18 @@ static void stream_cleanup(PROBE *p)
     for(i=0;i<p->count;i++) {
         port=(PORT*)p->ports[i];if(!port)continue;
         if(port->active && port->active!=INVALID_HANDLE_VALUE)DeactivateDevice(port->active);
+#ifdef COM_V7
+        /* stop is already signalled: pending USB waits leave before pipe close.
+         * Lock order rx -> tx -> config; neither I/O path takes the other lock. */
+        EnterCriticalSection(&port->rxIO);EnterCriticalSection(&port->txIO);
+#endif
         EnterCriticalSection(&port->io);
         if(port->in)p->usb->lpClosePipe(port->in);
         if(port->out)p->usb->lpClosePipe(port->out);
         port->in=port->out=NULL;LeaveCriticalSection(&port->io);
+#ifdef COM_V7
+        LeaveCriticalSection(&port->txIO);LeaveCriticalSection(&port->rxIO);
+#endif
         p->ports[i]=NULL;port_release(port);
     }
 }

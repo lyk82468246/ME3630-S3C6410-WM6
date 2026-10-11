@@ -1,6 +1,6 @@
 /* Codes measured using native APIs on CE5.2 build20782; see ioctl-abi.txt.
  * V4 deliberately supports a bounded subset, NOT Unimodem/PPP yet.
- * One I/O lock serializes reads/writes/control: full duplex not implemented. */
+ * V4-V6 serialize I/O; V7 separates RX/TX and snapshots configuration. */
 static BOOL serial_alive(PORT *port)
 {return WaitForSingleObject(port->parent->stop,0)!=WAIT_OBJECT_0 && port->in && port->out;}
 static BOOL serial_lines(PORT *port,DWORD lines)
@@ -36,11 +36,28 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
 static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
     DWORD start,limit,total=0,n,bytes;BOOL first;int result;BYTE stage[512];
+#ifdef COM_V7
+    CRITICAL_SECTION *direction=input?&port->rxIO:&port->txIO;
+#endif
     if(!count)return 0;
+#ifdef COM_V7
+    EnterCriticalSection(direction);
+#endif
     EnterCriticalSection(&port->io);
-    if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return (DWORD)-1;}
+    if(!serial_alive(port)){
+        LeaveCriticalSection(&port->io);
+#ifdef COM_V7
+        LeaveCriticalSection(direction);
+#endif
+        SetLastError(ERROR_DEVICE_NOT_CONNECTED);return (DWORD)-1;
+    }
     start=GetTickCount();limit=input?port->timeouts.ReadTotalTimeoutConstant:port->timeouts.WriteTotalTimeoutConstant;
     first=port->timeouts.ReadIntervalTimeout==MAXDWORD;
+#ifdef COM_V7
+    /* Per-call configuration snapshot; control remains independent of bulk I/O.
+     * The direction lock keeps this pipe/buffer alive until transfer completes. */
+    LeaveCriticalSection(&port->io);
+#endif
     while(total<count) {
         if(input && port->rxLen>port->rxPos) {
             n=port->rxLen-port->rxPos;if(n>count-total)n=count-total;
@@ -58,10 +75,22 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
             result=serial_transfer(port,port->out,stage,bytes,FALSE,limit-n,&bytes);
             if(result==1)total+=bytes;
         }
-        if(result<0){LeaveCriticalSection(&port->io);return (DWORD)-1;}
+        if(result<0){
+#ifdef COM_V7
+            LeaveCriticalSection(direction);
+#else
+            LeaveCriticalSection(&port->io);
+#endif
+            return (DWORD)-1;
+        }
         if(result==0)break;
     }
-    LeaveCriticalSection(&port->io);SetLastError(0);return total;
+#ifdef COM_V7
+    LeaveCriticalSection(direction);
+#else
+    LeaveCriticalSection(&port->io);
+#endif
+    SetLastError(0);return total;
 }
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {

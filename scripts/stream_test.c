@@ -45,6 +45,9 @@ static void control_test(HANDLE log,HANDLE port,LPCWSTR name)
  if(other!=INVALID_HANDLE_VALUE)CloseHandle(other);
 }
 #endif
+#ifdef COM_V7
+#include "duplex_test.inc"
+#endif
 void mainCRTStartup(void)
 {
     HANDLE log,port;DWORD i,j,bytes,n,error,total,attempt,passed=0;BOOL ok;WCHAR name[16],line[768];BYTE rx[2048];
@@ -55,7 +58,11 @@ void mainCRTStartup(void)
 #ifdef COM_V4
 #ifdef COM_V5
 #ifdef COM_V6
+#ifdef COM_V7
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v7.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v6.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v5.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif
@@ -128,6 +135,9 @@ void mainCRTStartup(void)
                 if(hasOK){passed++;break;}
             }
         }
+#ifdef COM_V7
+        duplex_test(log,port);
+#endif
         CloseHandle(port);
     }
     n=wsprintfW(line,L"\r\nCOMMANDS_PASSED=%lu/4 COMPLETE\r\n",passed);
@@ -136,7 +146,11 @@ void mainCRTStartup(void)
 #endif
     WriteFile(log,line,n*sizeof(WCHAR),&bytes,NULL);CloseHandle(log);
 #ifdef COM_V4
+#ifdef COM_V7
+    ExitProcess(passed==4 && failures==0 && checks==44?0:1);
+#else
     ExitProcess(passed==4 && failures==0 && checks==32?0:1);
+#endif
 #else
     ExitProcess(passed==4?0:1);
 #endif

@@ -1,5 +1,19 @@
 # 探索记录
 
+## 2026-10-11：V7 同句柄并发收发通过，继续等待重枚举后测试
+
+用户重新拔插模块后授权继续开发，短暂不稳定时等待。通过Joe实际32位WMDC读取V6最新日志（driver.txt增加后续枚举记录，先前版本仍在Git历史中），继续出现uptime重置/不同boot_id，尚无证据说明重启问题消失。本轮不改变供电、SIM、射频、APN或网络配置。
+
+V7分离rxIO、txIO、配置io锁；Read/Write在方向锁内短暂取配置快照，USB等待期间释放配置锁；接收缓存只由RX锁保护，发送使用本地缓冲。清理先stop，再按RX->TX->配置顺序取得锁关闭pipe；保留旧上下文引用计数。旧V4-V6编译路径仍保持单I/O锁。当前只实现同步RX/TX并发，不是完整串口MDD、事件、调制解调器状态或PPP。
+
+编译独立ME3630ComV7.dll/安装器/测试程序，安装dll_load1 installed1 error0，保留V6回退。实机DLL SHA256=badae88bbd940314fbf7384c109483732d1d3b4e4582e3ecfb5461ad10947440。新增duplex_test.inc：先启动接收线程并延迟200ms，再查询配置、发送AT，检查写不被读取期限阻塞且接收线程得到OK；每端口6项，连同原32项共44项。
+
+首轮测试tick13845940早于V7首次ATTACH13872517/READY13877909；旧V6实例仍活动。4/4命令通过，44项中6个并发断言失败，配置1815ms、写2008-2010ms。保留test-first-attempt.txt及driver-first-attempt.txt，不能认定为V7锁实现失败。等待新版本生效后第二轮tick13933581：4/4命令、44/44检查、FAILURES0 COMPLETE；COM1配置12ms/写4ms/读219ms，COM5配置12ms/写3ms/读219ms，两个读均6字节OK。对应second-attempt证据保留。
+
+deploy_com.ps1增加V7 READY等待（40秒有界）与新旧start_tick对比，拒绝以旧COMPLETE作新测试成功。READY历史标记不保证当前版本，仍应结合该版本STREAM_OPEN时间核验。增强脚本后的独立复测结果另记。没有请求再次拔插、没有拨号，未声称模块长期稳定或所有拔出并发竞态已验证。源码和限制见scripts/COM_V7.md。
+
+增强脚本后的第三轮tick14020260通过：COMMANDS_PASSED4/4 CONTROL_CHECKS44 FAILURES0 COMPLETE；等待串口可用后打开，COM1配置12ms/写2ms/读216ms，COM5配置12ms/写2ms/读218ms，两个并发读均6字节OK。系统采样为backlightoff flags10010000，不据此推断suspend或模块供电质量；随后tick14066298仍出现DETACH。最新test.txt/driver.txt保留，第二轮单独归档；两次新V7实例上的独立复测均通过。脚本语法及Git空白检查通过，发布日志长数字标识筛查后提交推送。
+
 ## 2026-10-11：V6 确认模块 Linux 重启，供电成为优先排查项
 
 通过Joe实际32位PowerShell/WMDC运行90秒V5稳定性应用，保持COM句柄直到I/O失效后关闭重开，仅查询AT/CFUN/CPIN并采样WM6系统电源状态。elapsed=90094ms，generations=4、successful_queries=27、losses=4；旧句柄写失败error1609，随后可重开。系统采样均systemon，不能证明模块供电正常。起初CFUN1/CPIN READY，后来CFUN0/SIM_NOT_INSERTED；用户明确未拔插、取放SIM或改变供电。证据evidence/2026-10-11-stability/monitor.txt、driver-window.txt。完整历史driver-v5.txt留本地；基线CFUN查询kind误标2，派生CFUN状态正确，后续源代码/二进制修正标签但未重跑，不改写原证据。

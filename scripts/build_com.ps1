@@ -1,4 +1,4 @@
-param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6)
+param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6,[switch]$Version7)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -8,6 +8,7 @@ $flags=@('/nologo','/TC','/O1','/GS-','/DUNICODE','/D_UNICODE','/DUNDER_CE','/D_
 $version=4
 if($Version5){$version=5;$flags+='/DCOM_V5'}
 if($Version6){if($Version5){throw 'Select a single version'};$version=6;$flags+=@('/DCOM_V5','/DCOM_V6')}
+if($Version7){if($Version5 -or $Version6){throw 'Select a single version'};$version=7;$flags+=@('/DCOM_V5','/DCOM_V6','/DCOM_V7')}
 if(!$TestsOnly) {
 & $cl @flags /DSTREAM_V3 /DCOM_V4 "/Fo$build\me3630_com_v$version.obj" "/Fe$build\ME3630ComV$version.dll" "$PSScriptRoot\me3630_probe.c" /link /DLL /NODEFAULTLIB /ENTRY:DllMain /SUBSYSTEM:WINDOWSCE,5.02 "/DEF:$PSScriptRoot\me3630_com.def" "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'COM DLL build failed'}
