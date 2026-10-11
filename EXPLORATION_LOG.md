@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-11：再次授权软重启后，真正进入RAS拨号并返回633
+
+用户同意第二次WM6软重启。run_softreset在Joe32位RAPI启动2899924650；启动期间首次RAPI Connect30秒超时，第二次成功，立即运行保存连接测试，无额外Host复位。新tick66656，COM5私有版本18确认；首次RasDial错误87且handle0，未建立会话。查微软CE5 RasDial官方文档后确认程序错误：CE仅支持notifierType FFFFFFFF+窗口句柄，不支持桌面RASDIALFUNC函数指针。ras_saved及旧ras_attempt均改为隐藏窗口、正确类型及消息泵，未改保存连接。
+
+修正后实际tick119783运行，唯一“ME3630 电信”COM5/*99***2#/PPP/IP匹配、port18，RasDial返回0及handle00f90060；随后state0到8193/disconnected、state_error633、窗口error633。本次RasHangUp仅本次handle，error0；130491完成elapsed10708 connected0。这是系统接受拨号并在端口阶段失败，不是PPP建立、不是数据号已送达模块或联网成功。633为端口不可用于拨出/已占用类错误，不能据码断言其他应用占用。驱动129264有新的STREAM_OPEN，但采样中无后续串口IOCTL/read/write，具体失败点待Unimodem兼容性诊断；V18不记录Close，不据缺失日志推断泄漏。
+
+证据ras-saved/dial-reset-api87.txt、dial-reset-633.txt、driver-dial633.txt；代码及聚焦证据及时推送。旧ras_attempt HWND修正仅构建，保存连接路线修正实机验证；不声称已解决驱动兼容性。API主来源：https://learn.microsoft.com/en-us/previous-versions/windows/embedded/aa450834(v=msdn.10)；633说明参阅微软Routing and Remote Access error codes及本地raserror.h。
+
 ## 2026-10-11：用户再次拔插后有界复测，仍无新USB枚举
 
 用户回复“好了”后直接在Joe32位RAPI执行run_rassaved -Dial。新开始630128，唯一正确ME3630电信条目仍在，号码/COM5/PPP/IP不变。等待重开30秒后660368完成elapsed30240，PORT_UNAVAILABLE error55；仍未调用RasDial。只读Active_ME3630_PORT_BLOCKS=0，HCD1及19d2:1432匹配到ME3630ComV18.dll均在，累计驱动日志最后169078 DETACH、双RX/notify join0，无本次ATTACH。聚焦新失败保存为ras-saved/dial-after-replug.txt；完整注册表仅本地。没有擅自再软重启或改LeadCore/WMDC。下一步需用户授权再次软重启；恢复后应尽快触发已准备的保存连接测试，避免上一轮先行多项诊断占用接入窗口。

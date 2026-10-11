@@ -8,19 +8,24 @@ static void emit(LPCWSTR label,DWORD a,DWORD b)
 {
     WCHAR text[180];DWORD n,bytes;n=wsprintfW(text,L"%s a=%lu b=%lu tick=%lu\r\n",label,a,b,GetTickCount());WriteFile(file,text,n*2,&bytes,NULL);FlushFileBuffers(file);
 }
-static void WINAPI notify(UINT message,RASCONNSTATE state,DWORD error)
+static LRESULT CALLBACK notify(HWND window,UINT message,WPARAM state,LPARAM error)
 {
+    if(message!=WM_RASDIALEVENT)return DefWindowProc(window,message,state,error);
     if(error)InterlockedExchange(&callbackError,error);
     if(error || state==RASCS_Connected || state==RASCS_Disconnected)InterlockedExchange(&terminal,1);
+    return 0;
 }
 void mainCRTStartup(void)
 {
     RASDEVINFOW devices[8];RASENTRY entry;RASDIALPARAMS params;RASCONNSTATUS status;RASPPPIP projection;
     DWORD bytes,count,error,i,attempt,begin,allBegin=GetTickCount();BOOL found,connected=FALSE,created=FALSE;HRASCONN connection=NULL;
     BYTE config[]={0x10,0,0,0,5,0,0,0,0x10,1,0,0,0,0xc2,1,0,0,0,8,0,0,0,0,0,0};
-    WCHAR entryName[64];
+    WCHAR entryName[64];WNDCLASS wc;HWND window=NULL;MSG msg;
     file=CreateFile(L"\\Temp\\ME3630-ras-attempt.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(file==INVALID_HANDLE_VALUE)ExitProcess(2);
     emit(L"RAS_ATTEMPT_START",allBegin,0);wsprintfW(entryName,L"ME3630-Test-%lu",allBegin);
+    memset(&wc,0,sizeof(wc));wc.lpfnWndProc=notify;wc.hInstance=GetModuleHandle(NULL);wc.lpszClassName=L"ME3630RasAttemptNotify";
+    if(RegisterClass(&wc))window=CreateWindow(wc.lpszClassName,L"",WS_POPUP,0,0,0,0,NULL,NULL,wc.hInstance,NULL);
+    if(!window){emit(L"WINDOW_ERROR",GetLastError(),0);emit(L"RAS_ATTEMPT_COMPLETE",0,GetTickCount()-allBegin);CloseHandle(file);ExitProcess(1);}
     for(attempt=1;attempt<=3 && GetTickCount()-allBegin<60000;attempt++) {
         found=FALSE;begin=GetTickCount();
         do {
@@ -39,8 +44,9 @@ void mainCRTStartup(void)
         }
         memset(&params,0,sizeof(params));params.dwSize=sizeof(params);lstrcpyW(params.szEntryName,entryName);
         InterlockedExchange(&terminal,0);InterlockedExchange(&callbackError,0);connection=NULL;
-        error=RasDial(NULL,NULL,&params,0,(LPVOID)notify,&connection);emit(L"DIAL_START",error,(DWORD)connection);begin=GetTickCount();
+        error=RasDial(NULL,NULL,&params,0xffffffff,(LPVOID)window,&connection);emit(L"DIAL_START",error,(DWORD)connection);begin=GetTickCount();
         if(!error && connection)do {
+            while(PeekMessage(&msg,NULL,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessage(&msg);}
             memset(&status,0,sizeof(status));status.dwSize=sizeof(status);error=RasGetConnectStatus(connection,&status);emit(L"DIAL_STATE",error,!error?status.rasconnstate:0);
             if(!error && status.rasconnstate==RASCS_Connected){connected=TRUE;break;}
             if(error || status.dwError || InterlockedCompareExchange(&terminal,0,0))break;Sleep(250);
@@ -56,5 +62,6 @@ void mainCRTStartup(void)
         if(connected)break;Sleep(1500);
     }
     if(created)emit(L"DELETE_OWN_TEST_ENTRY",RasDeleteEntry(NULL,entryName),0);
+    DestroyWindow(window);
     emit(L"RAS_ATTEMPT_COMPLETE",connected,GetTickCount()-allBegin);CloseHandle(file);ExitProcess(connected?0:1);
 }

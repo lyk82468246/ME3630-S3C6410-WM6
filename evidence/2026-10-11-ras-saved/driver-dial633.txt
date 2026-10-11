@@ -1,0 +1,11 @@
+Focused driver lines from the second user-approved soft reset.
+Raw accumulated driver stays local.
+[tick=123410] ATTACH vid=19d2 pid=1432 interface=-1 funcs_size=168
+[tick=128955] V18 READY duplex=1 queue=4096 line_events=DSR/RLSD/RING CTS=unknown
+[tick=128991] STREAM_OPEN index=2 access=c0000000
+[tick=129007] V4 IOCTL code=00223ffc in=0 out=4
+[tick=129264] STREAM_OPEN index=2 access=c0000000
+RAS app: DIAL_START error=0 handle=00f90060; disconnected state=8193 error633.
+No additional serial IOCTL/read/write in captured trace before failure.
+STREAM_CLOSE is not logged by V18; no conclusion from missing close records.
+Error633 does not establish that another app occupied the port.

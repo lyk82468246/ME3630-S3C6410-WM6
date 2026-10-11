@@ -12,17 +12,19 @@ static void emit(LPCWSTR fmt,...)
  WCHAR text[1024];DWORD bytes;int n;va_list ap;va_start(ap,fmt);n=wvsprintfW(text,fmt,ap);va_end(ap);
  WriteFile(logFile,text,n*2,&bytes,NULL);FlushFileBuffers(logFile);
 }
-static void WINAPI notify(UINT msg,RASCONNSTATE state,DWORD error)
+static LRESULT CALLBACK notify(HWND window,UINT msg,WPARAM state,LPARAM error)
 {
+ if(msg!=WM_RASDIALEVENT)return DefWindowProc(window,msg,state,error);
  if(error)InterlockedExchange(&cbError,error);
  if(error || state==RASCS_Connected || state==RASCS_Disconnected)InterlockedExchange(&done,1);
+ return 0;
 }
 void mainCRTStartup(void)
 {
  RASENTRYNAME *names;RASENTRY *entry;RASDIALPARAMS params;RASCONNSTATUS status;RASPPPIP ip;
  DWORD bytes,count=0,error,i,entryBytes,configBytes,start=GetTickCount(),matches=0,actual,version;
  BYTE config[4096];WCHAR selected[RAS_MaxEntryName+1];BOOL dial=wcsstr(GetCommandLineW(),L"--dial")!=NULL,connected=FALSE;
- HRASCONN connection=NULL;HANDLE port;
+ HRASCONN connection=NULL;HANDLE port;HWND window=NULL;WNDCLASS wc;MSG msg;
  logFile=CreateFile(L"\\Temp\\ME3630-ras-saved.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
  emit(L"SAVED_START tick=%lu dial=%lu\r\n",start,dial);
  bytes=sizeof(RASENTRYNAME);names=(RASENTRYNAME*)LocalAlloc(LPTR,bytes);if(!names)goto finish;
@@ -55,8 +57,14 @@ void mainCRTStartup(void)
  if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,4,&actual,NULL) || version!=18 || actual!=4){CloseHandle(port);emit(L"PORT_IDENTITY_REJECTED version=%lu bytes=%lu\r\n",version,actual);goto finish;}
  CloseHandle(port);emit(L"PORT_VERIFIED version=%lu\r\n",version);
  memset(&params,0,sizeof(params));params.dwSize=sizeof(params);lstrcpyW(params.szEntryName,selected);
- error=RasDial(NULL,NULL,&params,0,(LPVOID)notify,&connection);emit(L"DIAL_START error=%lu handle=%08lx\r\n",error,(DWORD)connection);
+ memset(&wc,0,sizeof(wc));wc.lpfnWndProc=notify;wc.hInstance=GetModuleHandle(NULL);wc.lpszClassName=L"ME3630RasNotify";
+ if(!RegisterClass(&wc)){emit(L"WINDOW_CLASS_ERROR=%lu\r\n",GetLastError());goto finish;}
+ window=CreateWindow(wc.lpszClassName,L"",WS_POPUP,0,0,0,0,NULL,NULL,wc.hInstance,NULL);
+ if(!window){emit(L"WINDOW_ERROR=%lu\r\n",GetLastError());goto finish;}
+ /* CE5 supports HWND notification, not desktop RASDIALFUNC callbacks. */
+ error=RasDial(NULL,NULL,&params,0xffffffff,(LPVOID)window,&connection);emit(L"DIAL_START error=%lu handle=%08lx\r\n",error,(DWORD)connection);
  if(!error && connection)do {
+  while(PeekMessage(&msg,NULL,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessage(&msg);}
   memset(&status,0,sizeof(status));status.dwSize=sizeof(status);error=RasGetConnectStatus(connection,&status);
   emit(L"STATE query_error=%lu state=%lu state_error=%lu\r\n",error,status.rasconnstate,status.dwError);
   if(!error && status.rasconnstate==RASCS_Connected){connected=TRUE;break;}
@@ -66,5 +74,6 @@ void mainCRTStartup(void)
  if(connected){memset(&ip,0,sizeof(ip));ip.dwSize=sizeof(ip);bytes=sizeof(ip);error=RasGetProjectionInfo(connection,RASP_PppIp,&ip,&bytes);emit(L"PPP_IP error=%lu projection_error=%lu\r\n",error,ip.dwError);if(!error && !ip.dwError)emit(L"PPP_ADDRESS ip=%s\r\n",ip.szIpAddress);else connected=FALSE;}
  if(connection){emit(L"HANGUP_OWN error=%lu\r\n",RasHangUp(connection));Sleep(500);}
 finish:
+ if(window)DestroyWindow(window);
  emit(L"SAVED_COMPLETE tick=%lu connected=%lu elapsed=%lu\r\n",GetTickCount(),connected,GetTickCount()-start);CloseHandle(logFile);ExitProcess(0);
 }
