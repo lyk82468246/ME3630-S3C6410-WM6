@@ -6,7 +6,7 @@
 void mainCRTStartup(void)
 {
     HKEY parent,key;DWORD result,disp,type=1,bytes,n;HANDLE log;WCHAR text[180];
-    /* Observed vendor 25-byte configuration: 115200 8N1, no flow options. */
+    /* Vendor's 25-byte layout, baud changed to 115200. Other flags not decoded. */
     BYTE config[]={0x10,0,0,0,5,0,0,0,0x10,1,0,0,0,0xc2,1,0,0,0,8,0,0,0,0,0,0};
     result=RegOpenKeyEx(HKEY_LOCAL_MACHINE,L"Drivers\\ME3630ComV18\\Port2",0,0,&parent);
     if(!result) {

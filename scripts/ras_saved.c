@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <ras.h>
 #include <raserror.h>
+#include <tapi.h>
 #include <stdarg.h>
 #undef wsprintfW
 #undef wvsprintfW
@@ -19,6 +20,37 @@ static LRESULT CALLBACK notify(HWND window,UINT msg,WPARAM state,LPARAM error)
  if(error || state==RASCS_Connected || state==RASCS_Disconnected)InterlockedExchange(&done,1);
  return 0;
 }
+static void tapi_probe(void)
+{
+ HLINEAPP app=NULL;HLINE line=NULL;LINEINITIALIZEEXPARAMS init;LINEEXTENSIONID ext;
+ LINEDEVCAPS *caps;VARSTRING *config,*id;DWORD count=0,version=0x20000,api,i,needed;LONG error;WCHAR name[256];
+ memset(&init,0,sizeof(init));init.dwTotalSize=sizeof(init);init.dwOptions=LINEINITIALIZEEXOPTION_USEEVENT;
+ error=lineInitializeEx(&app,GetModuleHandle(NULL),NULL,L"ME3630 scoped diagnostic",&count,&version,&init);
+ emit(L"TAPI_INIT error=%08lx count=%lu api=%08lx\r\n",error,count,version);if(error)return;
+ for(i=0;i<count && i<64;i++) {
+  error=lineNegotiateAPIVersion(app,i,0x10004,0x20000,&api,&ext);if(error)continue;
+  caps=(LINEDEVCAPS*)LocalAlloc(LPTR,16384);if(!caps)break;caps->dwTotalSize=16384;
+  error=lineGetDevCaps(app,i,api,0,caps);name[0]=0;
+  if(!error && caps->dwLineNameSize>=2 && caps->dwLineNameOffset<=16384 && caps->dwLineNameSize<=16384-caps->dwLineNameOffset) {
+   needed=caps->dwLineNameSize/2;if(needed>255)needed=255;memcpy(name,(BYTE*)caps+caps->dwLineNameOffset,needed*2);name[needed]=0;
+  }
+  if(!wcsstr(name,L"ME3630")){LocalFree(caps);continue;}
+  emit(L"TAPI_OWN id=%lu name=%s media=%08lx features=%08lx caps=%08lx\r\n",i,name,caps->dwMediaModes,caps->dwLineFeatures,caps->dwDevCapFlags);
+  LocalFree(caps);
+  config=(VARSTRING*)LocalAlloc(LPTR,4096);if(!config)break;config->dwTotalSize=4096;
+  error=lineGetDevConfig(i,config,L"comm/datamodem");emit(L"TAPI_CONFIG error=%08lx needed=%lu bytes=%lu format=%lu\r\n",error,config->dwNeededSize,config->dwStringSize,config->dwStringFormat);LocalFree(config);
+  /* Monitor only: no lineMakeCall, no configuration mutation. */
+  error=lineOpen(app,i,&line,api,0,0,LINECALLPRIVILEGE_MONITOR,LINEMEDIAMODE_DATAMODEM,NULL);emit(L"TAPI_OPEN_MONITOR error=%08lx\r\n",error);
+  if(!error){
+   id=(VARSTRING*)LocalAlloc(LPTR,4096);
+   if(id){id->dwTotalSize=4096;error=lineGetID(line,0,NULL,LINECALLSELECT_LINE,id,L"comm/datamodem/portname");emit(L"TAPI_PORTNAME error=%08lx bytes=%lu format=%lu\r\n",error,id->dwStringSize,id->dwStringFormat);
+    if(!error && id->dwStringOffset<=4096 && id->dwStringSize<=4096-id->dwStringOffset && id->dwStringSize<=128 && id->dwStringSize>=2 && id->dwStringFormat==STRINGFORMAT_UNICODE){memcpy(name,(BYTE*)id+id->dwStringOffset,id->dwStringSize);name[id->dwStringSize/2]=0;emit(L"TAPI_PORT value=%s\r\n",name);}LocalFree(id);
+   }
+   lineClose(line);line=NULL;
+  }
+ }
+ lineShutdown(app);
+}
 void mainCRTStartup(void)
 {
  RASENTRYNAME *names;RASENTRY *entry;RASDIALPARAMS params;RASCONNSTATUS status;RASPPPIP ip;
@@ -27,6 +59,7 @@ void mainCRTStartup(void)
  HRASCONN connection=NULL;HANDLE port;HWND window=NULL;WNDCLASS wc;MSG msg;
  logFile=CreateFile(L"\\Temp\\ME3630-ras-saved.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
  emit(L"SAVED_START tick=%lu dial=%lu\r\n",start,dial);
+ if(!dial)tapi_probe();
  bytes=sizeof(RASENTRYNAME);names=(RASENTRYNAME*)LocalAlloc(LPTR,bytes);if(!names)goto finish;
  names[0].dwSize=sizeof(RASENTRYNAME);error=RasEnumEntries(NULL,NULL,names,&bytes,&count);
  if(error==ERROR_BUFFER_TOO_SMALL && bytes<=65536){LocalFree(names);names=(RASENTRYNAME*)LocalAlloc(LPTR,bytes);if(!names)goto finish;names[0].dwSize=sizeof(RASENTRYNAME);error=RasEnumEntries(NULL,NULL,names,&bytes,&count);}

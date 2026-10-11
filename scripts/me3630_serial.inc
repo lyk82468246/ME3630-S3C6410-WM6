@@ -127,6 +127,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
     BOOL ok=FALSE;DWORD error=ERROR_INVALID_PARAMETER,lines;DCB dcb;COMMTIMEOUTS timeouts;
+#ifdef COM_DIAG33
+    logline(L"D33 IO_ENTER port=%lu pid=%lu code=%08lx in=%lu out=%lu\r\n",port->index,GetCurrentProcessId(),code,inSize,outSize);
+#endif
     if(actual)*actual=0;
 #ifdef COM_V8
     /* Wait must not hold the configuration lock: SetCommMask cancels it. */
@@ -249,5 +252,8 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
         ok=serial_lines(port,lines);if(!ok)error=GetLastError();break;
     default:error=ERROR_NOT_SUPPORTED;break;
     }
+#ifdef COM_DIAG33
+    logline(L"D33 IO_RETURN port=%lu code=%08lx ok=%lu error=%lu\r\n",port->index,code,ok,ok?0:error);
+#endif
     LeaveCriticalSection(&port->io);SetLastError(ok?0:error);return ok;
 }

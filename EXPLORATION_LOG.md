@@ -1,5 +1,11 @@
 # 探索记录
 
+## 2026-10-11：TAPI辨识成功，安装只增强日志的V18 D33变体
+
+继续定位633，不以猜测占用/缺某IOCTL直接修改成功语义。ras_saved inspect增加限定ME3630名称的lineInitializeEx/lineGetDevCaps/lineGetDevConfig/lineOpen MONITOR/lineGetID portname，最后关闭监视并shutdown；不拨号、不修改配置、不读凭据。tick329898实测TAPI总返回9、自己的line8 ME3630 Test COM5，media10/DATAMODEM、features8、caps1e0；config684、monitor open0；portname查询80000048为LINEERR_OPERATIONFAILED。保存连接仍唯一正确。不能用监视打开成功证明实际COM5健康，也不能从portname失败单独解释633。
+
+新增条件编译COM_DIAG33，只增加Open进入/Close/IOCTL进入与正常返回日志；维持V18接口限制，不伪造CTS或把未知请求返回成功。独立ME3630ComV18D33.dll，版本仍18，需D33日志及文件哈希确认诊断身份。Joe32位构建/安装443534 result0，只替换原精确19d2:1432匹配项DLL，保留原V18文件、Unimodem/IClass及保存连接。实际Active端口0且匹配D33，无激活/硬件测试成功证据，不擅自再软重启。新增runner语法通过，D33哈希和撤回方式见scripts/DIAG33.md；TAPI聚焦证据ras-saved/inspect.txt，安装证据diag33/install.txt，完整清单仅本地。
+
 ## 2026-10-11：再次授权软重启后，真正进入RAS拨号并返回633
 
 用户同意第二次WM6软重启。run_softreset在Joe32位RAPI启动2899924650；启动期间首次RAPI Connect30秒超时，第二次成功，立即运行保存连接测试，无额外Host复位。新tick66656，COM5私有版本18确认；首次RasDial错误87且handle0，未建立会话。查微软CE5 RasDial官方文档后确认程序错误：CE仅支持notifierType FFFFFFFF+窗口句柄，不支持桌面RASDIALFUNC函数指针。ras_saved及旧ras_attempt均改为隐藏窗口、正确类型及消息泵，未改保存连接。

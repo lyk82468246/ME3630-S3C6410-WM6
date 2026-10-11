@@ -89,6 +89,9 @@ BOOL M36_Deinit(DWORD context){port_release((PORT*)context);return TRUE;}
 DWORD M36_Open(DWORD context,DWORD access,DWORD share)
 {
     PORT *port=(PORT*)context;
+#ifdef COM_DIAG33
+    logline(L"D33 OPEN_ENTER port=%lu pid=%lu access=%08lx share=%08lx opened=%ld\r\n",port->index,GetCurrentProcessId(),access,share,port->opened);
+#endif
     if(WaitForSingleObject(port->parent->stop,0)==WAIT_OBJECT_0){SetLastError(ERROR_DEVICE_NOT_CONNECTED);return 0;}
     if(InterlockedCompareExchange(&port->opened,1,0)!=0){SetLastError(ERROR_SHARING_VIOLATION);return 0;}
     InterlockedIncrement(&port->refs);
@@ -98,6 +101,9 @@ DWORD M36_Open(DWORD context,DWORD access,DWORD share)
 BOOL M36_Close(DWORD context)
 {
     PORT *port=(PORT*)context;
+#ifdef COM_DIAG33
+    logline(L"D33 CLOSE port=%lu pid=%lu opened=%ld refs=%ld\r\n",port->index,GetCurrentProcessId(),port->opened,port->refs);
+#endif
 #ifdef COM_V8
     EnterCriticalSection(&port->io);port->eventMask=0;port->eventPending=0;port->eventEpoch++;
 #ifdef COM_V9
@@ -285,7 +291,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V16
 #ifdef COM_V17
 #ifdef COM_V18
+#ifdef COM_DIAG33
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D33.dll",sizeof(L"ME3630ComV18D33.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18.dll",sizeof(L"ME3630ComV18.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV17.dll",sizeof(L"ME3630ComV17.dll"));
 #endif
