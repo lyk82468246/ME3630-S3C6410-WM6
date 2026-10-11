@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：按有效电信卡推进首次联网，不以长期稳定性为前置
+
+实机RAS程序tick4125692完成3次枚举等待、45352ms，自己的ME3630 Test COM5均未出现，RAS_ATTEMPT_COMPLETE connected0。没有到达创建条目/RasDial调用，不声称已经发起数据会话，更不声称上网。未选既有蜂窝设备作为替代；保留该失败证据。两个前端均改为75秒内新开始标记+完成标记确认，已编译Native并通过脚本语法，尚需恢复USB Host枚举才能继续。所有修改与聚焦失败/成功查询均按用户要求及时推送。
+
+用户明确暂不排查稳定性，断线后重试，并确认有效中国电信SIM。新增只读network_probe、受限Unimodem注册和实际RAS拨号重试程序，全部在Joe32位RAPI执行/构建，不替换V18或其他厂商驱动。首probe tick3688802在实例18上完整读取10项，2456ms完成：CFUN1 CPIN READY；CSQ99/99、COPS0、CREG/CEREG0/2、CGATT0；现有CID1 IPV4V6/ctnet、CID2 IP/ctnet均inactive。不改APN/RF/SIM/IMEI；未注册网络不能当成上网成功。
+
+CE没有桌面rasapi32.dll（初测126），改coredll/ppp导出后RasEnumDevices成功，但仅Cellular Line，严禁误当ME3630拨号。限定自己的Drivers/ME3630ComV18/Port2注册IClass和Unimodem/Tsp/DeviceType1/FriendlyName ME3630 Test COM5/25字节DevConfig，仅将用户vendor格式baud改115200；tick3829231及补IClass后的3975231均result0，不改LeadCore/WMDC注册项。注册成功不是TAPI枚举成功，要等下一次ActivateDevice。
+
+最新驱动日志止于detach3720349且双RX/notify join0；后续Active无ME3630、无新ATTACH，OHCI/匹配仍在。用户按请求重新拔插后probe3995093仍generations0/all_queries0/elapsed60276，软件等待不造假设备。一次早期probe取到未完成片段，保留失败；runner改为75秒内检查新start与COMPLETE，避免固定sleep误判。RAS尝试仅选精确自己的modem名，3x15秒枚举/60秒循环范围，若找到再创建唯一临时PPP/IP条目、*99***2#、观察IP投影，最后只挂断/删除本次条目；没有互联网成功证据。详细语义、主来源和后续条件见scripts/NETWORK_FIRST_LINK.md，聚焦证据2026-10-11-network-probe、unimodem-register、ras-attempt；完整Active/累计driver-local留本地。恢复Host枚举可能需WM6软重启，不能擅自结束设备应用/同步。
+
 ## 2026-10-11：V18 部分线路事件，模拟隔离21项通过
 
 第二轮新进程tick3065370双句柄确认18、AT/ATI4/4、162项零失败。两端口line mask/CTS原子拒绝/取消均通过，等待225/219ms、取消调用17/16ms、mask0；notification accepted11/10 rejected0 knownE0 status00 raw00 error0，累计日志同一行多tick0。一个掉线中断失败、一个完整通过窗口，不称连续通过或长期稳定；真实正线路边沿未出现。源码/模拟21项/首轮失败已及时推送4a1eaab，追加第二轮聚焦脱敏证据和记录；保持原接线供电，无拨号/RF/APN/SIM改动。
