@@ -1,5 +1,11 @@
 # 探索记录
 
+## 2026-10-11：用户授权软重启，USB枚举恢复，但尚未拨号
+
+用户同意后新增soft_reset.c/run_softreset.ps1，在Joe32位RAPI发送一次SetSystemPowerState(NULL, POWER_STATE_RESET, POWER_FORCE)。先刷新注册表和请求日志，不设清除/冷启动标志、不恢复出厂、不复位Windows电脑。依据SDK pm.h及微软CE5文档 https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms920754(v=msdn.10)；远程进程201911462启动成功。重连早期Active暂为0，随后新设备tick72764 ATTACH，78236 COM1、78362 COM5、78379 V18 READY；新启动计时及WMDC重连证实软重启完成。再次掉线93341后101079重新ATTACH、106639 READY，已证明此窗口内驱动重新接入，而非持续稳定。
+
+只读网络probe start82033，在V18句柄上10项全部完成，2248ms；CPIN READY、CFUN1、现有ctnet不变，但CSQ99/99、CREG/CEREG0/2、CGATT0，尚未注册。RAS仍仅既有Cellular Line。限定ME3630名称的RAS测试105798启动，3轮均未枚举出自己的modem，151442结束connected0、45644ms；没有调用RasDial，没有更改默认路由，也不借用LeadCore。下一步应核验Unimodem注册持久性、TAPI发现及实际串口接口需求，同时等待网络注册，不能将恢复AT等同于上网。证据evidence/2026-10-11-soft-reset，完整Active/USB清单不发布。
+
 ## 2026-10-11：按有效电信卡推进首次联网，不以长期稳定性为前置
 
 实机RAS程序tick4125692完成3次枚举等待、45352ms，自己的ME3630 Test COM5均未出现，RAS_ATTEMPT_COMPLETE connected0。没有到达创建条目/RasDial调用，不声称已经发起数据会话，更不声称上网。未选既有蜂窝设备作为替代；保留该失败证据。两个前端均改为75秒内新开始标记+完成标记确认，已编译Native并通过脚本语法，尚需恢复USB Host枚举才能继续。所有修改与聚焦失败/成功查询均按用户要求及时推送。

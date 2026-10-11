@@ -1,0 +1,13 @@
+User authorized one WM6 soft reset on 2026-10-11.
+Launched remote reset PID=201911462; POWER_STATE_RESET/POWER_FORCE, no clean boot flag.
+Early reconnect Active ME3630 count=0, OHCI HCD1 present.
+Later driver trace:
+tick72764 ATTACH VID19d2 PID1432
+tick78236 COM1 activated; tick78362 COM5 activated; tick78379 V18 READY
+tick93341 DETACH
+tick101079 ATTACH; tick106503 COM1; tick106623 COM5; tick106639 V18 READY
+Network probe start82033 generation1 instance18 all_queries1 elapsed2248.
+SIM READY, searching registration; no packet attachment.
+RAS attempt start105798: own modem not enumerated in all three windows.
+Complete151442 connected0 elapsed45644. RasDial not reached.
+No internet success; not a continuous stability result.
