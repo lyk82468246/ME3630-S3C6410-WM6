@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-11：核验用户向导保存的ME3630连接，串口缺失阻止本次拨号
+
+用户反馈WM6已提示新调制解调器，向导可见COM1 Hayes与COM5 Test，并按指导保存“ME3630 电信”，尚未连接。不能把先前RasEnumDevices未找到精确名字直接推断为整个TAPI未识别。新增ras_saved.c/run_rassaved.ps1，通过RasEnumEntries和RasGetEntryProperties只检查ME3630名称条目，不读密码，不改变/删除条目。实际tick483355读到该连接：type modem、device ME3630 Test COM5、phone *99***2#、framing1(PPP)、protocols4(IP)、options00400208；系统保存的devconfig长度684，区别于原注册25字节，不假定同一种格式。枚举返回count10、bytes480，不据此声称10个真实连接。
+
+单次拨号入口需该绑定/号码/PPP/IP精确匹配且唯一，并在调用RasDial前通过COM5私有版本18核验，防止误用LeadCore复用端口。首次tick500222、第二次520709均在该前置因COM5不可用error55退出；后者按用户要求自动重开等待30秒，550855完成elapsed30146，仍无设备。RasDial未调用，没有拨号失败码/PPP地址可供判断。驱动累计日志最新仍止于169078 DETACH，双RX/notify join0，无之后新ATTACH。保存连接已核验正确，当前阻塞仍是硬件未重新枚举，不要求用户重新建连接。此次未追加软重启。
+
+实现提供单次有界异步拨号/状态/PPP投影检测，只挂断自己的会话，不删除用户连接；当前这部分因无端口尚未实测。循环45秒/前端65秒不是对单个OS调用的硬超时。证据evidence/2026-10-11-ras-saved/inspect.txt、dial-first.txt、dial.txt。主API资料：https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms897105(v=msdn.10) 与SDK ras.h；按用户要求记录并推送。
+
 ## 2026-10-11：用户授权软重启，USB枚举恢复，但尚未拨号
 
 用户同意后新增soft_reset.c/run_softreset.ps1，在Joe32位RAPI发送一次SetSystemPowerState(NULL, POWER_STATE_RESET, POWER_FORCE)。先刷新注册表和请求日志，不设清除/冷启动标志、不恢复出厂、不复位Windows电脑。依据SDK pm.h及微软CE5文档 https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms920754(v=msdn.10)；远程进程201911462启动成功。重连早期Active暂为0，随后新设备tick72764 ATTACH，78236 COM1、78362 COM5、78379 V18 READY；新启动计时及WMDC重连证实软重启完成。再次掉线93341后101079重新ATTACH、106639 READY，已证明此窗口内驱动重新接入，而非持续稳定。
