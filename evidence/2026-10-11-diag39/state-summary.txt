@@ -1,0 +1,20 @@
+D39 installed9678003 result0 next_attach_only1; exact ME3630 match only.
+DLL SHA256 E632C4A9FA44A43B387118332C663BD72DE7978ACDAD820C1B730F73EE28C37D.
+Native isolated ownership15/compat33/recorder29 zero failures (77 distinct checks).
+Host snapshot-save regression5 zero failures; recorder29 repeated at911177.
+Pre-reset observers9700364 and9806079 each complete90s next0/dropped0.
+Saved attempts9713734 and9819013 port-unavailable55, no RasDial.
+User confirmed replug, then explicitly authorized ONE soft reset PID3437227770.
+Initial reconnect0x8000ffff; later WMDC restored without another reset.
+Initial post-reset capture54517/attempt73066 local results incomplete; unknown outcome.
+Actual later D39 snapshot415069..415160 next159/dropped0:
+ ATTACH374619; READY2 at379664; both notify states380248 known=e0/status0/raw0.
+ Carrier low in this valid sample; CTS unknown. No handoff requests in this snapshot.
+Supervisor555460..645547 held map and child handles: both wait0/exit0.
+Capture555490..645507 next0/dropped0; attempt555533..585664 port55, no RasDial.
+Failed live RAPI reads can truncate local evidence: staged-copy fix verified.
+No successful PPP/IP or Internet. Exact rejected handoff mask/DCB remains unmeasured.
+Enumeration/recovery gap remains; D39 is diagnostics, NOT a hotplug or modem-status fix.
+No LeadCore/WMDC/saved-entry changes, no process termination or USB Host reset.
+Final read-only Active registry query also reported ME3630 port blocks0.
+See scripts/DIAG39.md for field semantics, caveats and focused evidence.

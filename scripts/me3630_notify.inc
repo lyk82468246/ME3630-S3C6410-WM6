@@ -38,6 +38,9 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
         EnterCriticalSection(&port->io);
 #ifdef COM_V18
         m36_update_notify(&port->notifyState,data,bytes,port->index,GetTickCount(),port->eventMask,&port->eventPending);
+#ifdef COM_DIAG39
+        if(valid)m39_line_record(life,(DWORD)port,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,port->eventMask,port->eventPending);
+#endif
 #ifdef COM_DIAG35
         if(valid)port->commErrors|=m36_notify_errors(raw);
 #endif
@@ -60,6 +63,9 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
 #ifdef COM_V17
     EnterCriticalSection(&port->io);port->notifyState.known=0;
     port->notifyState.error=WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0?ERROR_DEVICE_NOT_CONNECTED:ERROR_IO_DEVICE;
+#ifdef COM_DIAG39
+    m39_line_record(life,(DWORD)port,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,port->eventMask,port->eventPending);
+#endif
 #ifdef COM_V18
     SetEvent(port->eventWake);
 #endif

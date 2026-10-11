@@ -1,0 +1,7 @@
+PASS successful_copy_published
+PASS successful_stage_retired
+PASS false_copy_preserves_evidence
+PASS exception_preserves_evidence
+PASS retry_publishes_success
+RAPI_SNAPSHOT_UNIT CHECKS=5 FAILURES=0 COMPLETE
+POWERSHELL_PARSE_FAILURES=0

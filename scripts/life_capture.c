@@ -15,7 +15,9 @@ void mainCRTStartup(void)
 #ifdef COM_DIAG38
  M37_RECORD snapshot[M37_CAP];BOOL valid[M37_CAP];LONG slot;
 #endif
-#ifdef COM_DIAG38
+#ifdef COM_DIAG39
+ logFile=CreateFile(L"\\Temp\\ME3630-life-capture-d39.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#elif defined(COM_DIAG38)
  logFile=CreateFile(L"\\Temp\\ME3630-life-capture-d38.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #else
  logFile=CreateFile(L"\\Temp\\ME3630-life-capture.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);

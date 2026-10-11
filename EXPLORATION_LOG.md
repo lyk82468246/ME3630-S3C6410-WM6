@@ -1,5 +1,17 @@
 # 探索记录
 
+## 2026-10-11：D39补精确参数/载波诊断，修正RAPI失败读取破坏本地证据
+
+D39继承D38/D36，不改串口结果/所有权/取消/清理策略，追加IOCTL实际in/out长度、SetMask/Purge DWORD、DCB长度/波特率/flags/格式、超时字段及真实通知known/status/raw/age/事件。请求记录在元数据拒绝之前，仅读精确已知配置结构，不录串口载荷/密码/IMEI；线路组在已有锁内，CTS仍未知，GetCommModemStatus仍不支持。独立ME3630ComV18D39.dll/public18/private39及命名映射；SHA256 E632C4A9FA44A43B387118332C663BD72DE7978ACDAD820C1B730F73EE28C37D，见scripts/DIAG39.md，不声称兼容性/重枚举修复。
+
+Joe32位WMDC部署前，ownership15/15 tick9672278、compat33/33 tick9674520、life29/29 tick9675717均零失败，共77项隔离检查；新增10项测试覆盖请求精确编码、空/短/未知不读、DCB来源不修改和线路有效性/错误码保留。9678003 install result0 next_attach_only1，仅原精确USB匹配DLL更换。第一观察9700364..9790452 next0/dropped0、拨号检查9713734..9744220 error55未调用RAS；只读Active0/HCD1仍在、匹配D39。用户拔插等30s后，第二观察9806079..9896081亦next0，检查9819013..9849166 error55未拨号。
+
+用户明确允许这一次WM6软重启，PID3437227770；首次重连0x8000ffff，第二次恢复，无第二次重启。观察54517和保存连接检查73066在PC采集期限内只有不完整本地日志，不能判定具体RAS错误或永久驱动卡住；回收73066仍无COMPLETE。只读Active随后出现自己的COM1/5。新增独立one-shot内存快照及本任务进程清单（不截断运行观察日志、无USB/COM写），实测D39在运行：257316快照next115，231598 READY2；聚焦保留的415069..415160快照next159/dropped0，374619 ATTACH、379664 READY2，380248双端口known=e0/status0/raw0/age0，是真实载波低样本，不是无线注册状态或PPP交接载波方向，CTS未知。映射跨寿命序号重置；不能据零记录/不完整历史数出全部断开轮次。历史PID OpenProcess/退出码探索值不可靠，最终改为Toolhelp列本任务进程；415069/661617仅快照进程在，无“永远卡住”的证据。转储目录0亦不能排除异常。
+
+新增监护程序持真实子进程句柄/映射、不强杀、不复位；555460..645547 elapsed90087，capture732995454和dial1270102386实际wait0/exit0。关闭后重读完整日志：观察555490..645507 next0/dropped0，检查555533..585664 error55未拨号。这次晚期端口缺失是正常完成，不反推初期不完整运行亦正常。诊断过程中发现RAPI TryCopy返回false之前会截断/写一部分本地目标，使失败轮次破坏上一次成功快照；新增rapi_snapshot staging，仅成功发布，失败/异常保留原证据，仍核验新start/COMPLETE，不称无损采集。5项主机假RAPI回归零失败；实际WM6 tick911177 life29复测亦通过，所有PS语法通过。已安装DLL哈希未变。
+
+证据evidence/2026-10-11-diag39：install/隔离测试、双空观察、snapshot-active、监护关闭后完整日志、state-summary；完整注册表和failed-copy staging仍本地。最终只读Active再次为自己的端口0。保存电信连接/LeadCore/WMDC未改，未获PPP/IP；精确交接参数尚未实测，后续仍需模块实际可打开。恢复枚举缺口未修好，本轮未再次擅自重启或强卸载Host。源码、自编工具与聚焦证据按授权提交推送。
+
 ## 2026-10-11：D38补串口/USB内存轨迹，自然加载，拨号进入不同失败阶段
 
 继续开发，D38继承D37/D36，不改串口结果/所有权/取消/清理策略，不重启或强卸载；独立DLL和D38命名映射，追加Open/Close/Read/Write/IOCTL/事件等待、RX入队/订阅保留/交付，以及USB实际状态/字节数。status API失败不声称输出有效，API TRUE亦不等于USB无错；field语义随事件变化，无串口载荷/IMEI/密码，详见scripts/DIAG38.md。19项记录器、33项兼容、15项所有权原生隔离共67项零失败(tick703355/702162/699914)，不是完整USB并发验证。D38及旧D33构建通过，runner语法通过。705688安装result0 next_attach_only1，自然757394 ATTACH、762415/762439双COM激活READY2。SHA256 11FB62DB92B9651ED8DE953586796368013A88BACE9A0B3118DF969988C9FB3F。观察runner初次新增编译参数异常在设备启动前失败，完整参数数组修正后成功；未改已加载DLL。保存连接测试新增private38强校验，避免误测旧版；条目不修改。

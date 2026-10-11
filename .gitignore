@@ -5,6 +5,7 @@
 /build/*.obj
 /build/*.lib
 /build/*.exp
+/build/snapshot-unit-local/
 __pycache__/
 
 # Full device inventories remain local; publish focused results and USB traces.
@@ -45,5 +46,11 @@ __pycache__/
 /evidence/2026-10-11-diag37/capture-previous-local.txt
 /evidence/2026-10-11-diag38/*previous-local.txt
 /evidence/2026-10-11-diag38/ras/previous-local.txt
+/evidence/2026-10-11-diag39/*previous-local.txt
+/evidence/2026-10-11-diag39/ras/previous-local.txt
+/evidence/2026-10-11-diag39/ras-after-replug/previous-local.txt
+/evidence/2026-10-11-diag39/ras-after-reset/previous-local.txt
+/evidence/2026-10-11-diag39/supervised/previous-local.txt
+/evidence/**/*-partial-local.txt
 # Accumulated trace; publish only the bounded stability window.
 /evidence/2026-10-11-stability/driver-v5.txt

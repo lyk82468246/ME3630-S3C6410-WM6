@@ -43,6 +43,31 @@ void mainCRTStartup(void)
  m38_status_record(second,55,FALSE,99,0,6);end=InterlockedCompareExchange(&second->next,0,0);
  check(L"failed_status_not_claimed",m37_get(second,end,&record) && record.event==M38_USB_RESULT_UNAVAILABLE && record.value==0 && record.error==6);
 #endif
+#ifdef COM_DIAG39
+ {
+  DWORD word=EV_TXEMPTY|EV_RXCHAR,flags;DCB d,copy;COMMTIMEOUTS t;
+  check(L"d39_event_names",!lstrcmpW(m37_event_name(M39_REQUEST_WORD),L"REQUEST_WORD") && !lstrcmpW(m37_event_name(M39_LINE_EVENTS),L"LINE_EVENTS"));
+  SetLastError(5432);m39_control_record(second,77,0x001b0028,(BYTE*)&word,4,0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"requested_unsupported_mask_exact",m37_get(second,end,&record) && record.event==M39_REQUEST_WORD && record.value==0x001b0028 && record.error==word && GetLastError()==5432);
+  begin=end;m39_control_record(second,77,0x001b0054,NULL,sizeof(DCB),0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"null_configuration_not_read",end==begin+1 && m37_get(second,end,&record) && record.event==M39_REQUEST_SIZE);
+  begin=end;m39_control_record(second,77,0x001b0054,(BYTE*)&word,4,0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"short_DCB_not_read",end==begin+1);
+  memset(&d,0,sizeof(d));d.DCBlength=sizeof(d);d.BaudRate=19200;d.ByteSize=8;d.Parity=NOPARITY;d.StopBits=ONESTOPBIT;d.fBinary=1;d.fOutxCtsFlow=1;d.fRtsControl=RTS_CONTROL_HANDSHAKE;copy=d;memcpy(&flags,(BYTE*)&d+8,4);
+  m39_control_record(second,77,0x001b0054,(BYTE*)&d,sizeof(d),0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"DCB_length_baud_exact",m37_get(second,end-1,&record) && record.event==M39_DCB_LENGTH_BAUD && record.value==sizeof(d) && record.error==19200);
+  check(L"DCB_flags_format_source_unchanged",m37_get(second,end,&record) && record.event==M39_DCB_FLAGS_FORMAT && record.value==flags && record.error==8 && !memcmp(&d,&copy,sizeof(d)));
+  t.ReadIntervalTimeout=50;t.ReadTotalTimeoutMultiplier=1;t.ReadTotalTimeoutConstant=50;t.WriteTotalTimeoutMultiplier=5;t.WriteTotalTimeoutConstant=500;
+  m39_control_record(second,77,0x001b003c,(BYTE*)&t,sizeof(t),0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"timeout_fields_exact",m37_get(second,end-2,&record) && record.value==50 && m37_get(second,end-1,&record) && record.value==1 && record.error==50 && m37_get(second,end,&record) && record.value==5 && record.error==500);
+  begin=end;m39_control_record(second,77,0x12345678,(BYTE*)1,4096,4);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"unknown_request_not_read",end==begin+1);
+  SetLastError(6543);m39_line_record(second,77,0xe0,0x80,1,GetTickCount(),0,0x1f9,EV_RLSD);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"line_state_pending_error_preserved",m37_get(second,end-2,&record) && record.value==0x80 && record.error==0xe0 && m37_get(second,end,&record) && record.value==0x1f9 && record.error==EV_RLSD && GetLastError()==6543);
+  m39_line_record(second,77,0,0x80,1,GetTickCount(),ERROR_IO_DEVICE,0,0);end=InterlockedCompareExchange(&second->next,0,0);
+  check(L"invalid_line_age_not_known_low",m37_get(second,end-2,&record) && record.error==0 && m37_get(second,end-1,&record) && record.error==MAXDWORD);
+ }
+#endif
  if(joined && (!created || n==WAIT_OBJECT_0))m37_close(second,b);
 done:
  n=wsprintfW(s,L"LIFE_UNIT CHECKS=%lu FAILURES=%lu COMPLETE\r\n",checks,failures);WriteFile(logFile,s,n*2,&bytes,NULL);CloseHandle(logFile);ExitProcess(failures?1:0);

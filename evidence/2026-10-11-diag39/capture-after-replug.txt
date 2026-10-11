@@ -1,0 +1,3 @@
+LIFE_CAPTURE start_tick=9806079 duration=90000
+SUMMARY next=0 dropped=0
+LIFE_CAPTURE COMPLETE tick=9896081 elapsed=90002

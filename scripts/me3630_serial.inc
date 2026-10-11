@@ -199,12 +199,18 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #endif
     EnterCriticalSection(&port->io);
     if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return FALSE;}
+#ifdef COM_DIAG39
+    if(code==0x001b0034 || code==M36_NOTIFY_QUERY)
+        m39_line_record(life,(DWORD)port,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,port->eventMask,port->eventPending);
+#endif
     logline(L"V4 IOCTL code=%08lx in=%lu out=%lu\r\n",code,inSize,outSize);
     switch(code) {
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG38
+#ifdef COM_DIAG39
+            *(DWORD*)out=39;
+#elif defined(COM_DIAG38)
             *(DWORD*)out=38;
 #elif defined(COM_DIAG37)
             *(DWORD*)out=37;

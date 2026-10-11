@@ -231,6 +231,9 @@ BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWOR
 BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
  BOOL result;DWORD error;LIFE(M38_IOCTL_BEGIN,context,code,0);
+#ifdef COM_DIAG39
+ m39_control_record(life,context,code,in,inSize,outSize);
+#endif
  result=stream_control_impl(context,code,in,inSize,out,outSize,actual);error=GetLastError();
  LIFE(M38_IOCTL_END,context,result,error);return result;
 }
@@ -388,7 +391,9 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG34R2
 #ifdef COM_DIAG35
 #ifdef COM_DIAG36
-#ifdef COM_DIAG38
+#ifdef COM_DIAG39
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D39.dll",sizeof(L"ME3630ComV18D39.dll"));
+#elif defined(COM_DIAG38)
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D38.dll",sizeof(L"ME3630ComV18D38.dll"));
 #elif defined(COM_DIAG37)
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D37.dll",sizeof(L"ME3630ComV18D37.dll"));

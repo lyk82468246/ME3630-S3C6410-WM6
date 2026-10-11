@@ -55,7 +55,7 @@ void mainCRTStartup(void)
 {
  RASENTRYNAME *names;RASENTRY *entry;RASDIALPARAMS params;RASCONNSTATUS status;RASPPPIP ip;
  DWORD bytes,count=0,error,i,entryBytes,configBytes,start=GetTickCount(),matches=0,actual,version;
- BYTE config[4096];WCHAR selected[RAS_MaxEntryName+1];BOOL dial=wcsstr(GetCommandLineW(),L"--dial")!=NULL,connected=FALSE,require38=wcsstr(GetCommandLineW(),L"--require-d38")!=NULL;
+ BYTE config[4096];WCHAR selected[RAS_MaxEntryName+1];BOOL dial=wcsstr(GetCommandLineW(),L"--dial")!=NULL,connected=FALSE;DWORD expected=wcsstr(GetCommandLineW(),L"--require-d39")?39:(wcsstr(GetCommandLineW(),L"--require-d38")?38:0);
  HRASCONN connection=NULL;HANDLE port;HWND window=NULL;WNDCLASS wc;MSG msg;
  logFile=CreateFile(L"\\Temp\\ME3630-ras-saved.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
  emit(L"SAVED_START tick=%lu dial=%lu\r\n",start,dial);
@@ -90,7 +90,7 @@ void mainCRTStartup(void)
  if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,4,&actual,NULL) || version!=18 || actual!=4){CloseHandle(port);emit(L"PORT_IDENTITY_REJECTED version=%lu bytes=%lu\r\n",version,actual);goto finish;}
  {DWORD diagnostic=0,diagBytes=0;BOOL identified=DeviceIoControl(port,0x00223ff4,NULL,0,&diagnostic,4,&diagBytes,NULL) && diagBytes==4;
   if(identified)emit(L"PORT_DIAGNOSTIC build=%lu\r\n",diagnostic);
-  if(require38 && (!identified || diagnostic!=38)){CloseHandle(port);emit(L"PORT_DIAGNOSTIC_REJECTED expected=38 actual=%lu identified=%lu\r\n",diagnostic,identified);goto finish;}
+  if(expected && (!identified || diagnostic!=expected)){CloseHandle(port);emit(L"PORT_DIAGNOSTIC_REJECTED expected=%lu actual=%lu identified=%lu\r\n",expected,diagnostic,identified);goto finish;}
  }
  CloseHandle(port);emit(L"PORT_VERIFIED version=%lu\r\n",version);
  memset(&params,0,sizeof(params));params.dwSize=sizeof(params);lstrcpyW(params.szEntryName,selected);

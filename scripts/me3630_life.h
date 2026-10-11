@@ -1,7 +1,9 @@
 /* CE5 named, page-backed flight recorder. No waits/file I/O in record(). */
 #define M37_CAP 256
 #define M37_MAGIC 0x37334d36
-#ifdef COM_DIAG38
+#ifdef COM_DIAG39
+#define M37_NAME L"ME3630D39Lifecycle"
+#elif defined(COM_DIAG38)
 #define M37_NAME L"ME3630D38Lifecycle"
 #else
 #define M37_NAME L"ME3630D37Lifecycle"
@@ -19,7 +21,10 @@ enum {M37_ATTACH_ENTER=1,M37_DEVICE_INFO,M37_REGISTER_BEGIN,M37_REGISTER_END,
  M38_USB_RESULT,M38_USB_RESULT_UNAVAILABLE,M38_OPEN_BEGIN,M38_OPEN_END,
  M38_CLOSE_BEGIN,M38_CLOSE_END,M38_READ_BEGIN,M38_READ_END,M38_WRITE_BEGIN,M38_WRITE_END,
  M38_IOCTL_BEGIN,M38_IOCTL_END,M38_RX_PUSH,M38_RX_EVENTS,M38_MASK_STATE,
- M38_WAIT_BEGIN,M38_WAIT_END,M38_WAIT_MASK,M38_TRANSFER_ISSUE,M38_TRANSFER_SUBMITTED};
+ M38_WAIT_BEGIN,M38_WAIT_END,M38_WAIT_MASK,M38_TRANSFER_ISSUE,M38_TRANSFER_SUBMITTED,
+ M39_REQUEST_SIZE,M39_REQUEST_WORD,M39_DCB_LENGTH_BAUD,M39_DCB_FLAGS_FORMAT,
+ M39_TIMEOUT_READ,M39_TIMEOUT_WRITE,M39_TIMEOUT_INTERVAL,
+ M39_LINE_STATE,M39_LINE_SAMPLE,M39_LINE_EVENTS};
 /* Shared control fields are accessed through Interlocked APIs, not plain reads. */
 typedef struct {LONG busy,commit;DWORD tick,pid,tid,event,object,value,error;} M37_RECORD;
 typedef struct {LONG ready,next,dropped;DWORD magic,size;M37_RECORD slots[M37_CAP];} M37_MAP;
@@ -70,10 +75,41 @@ static void m38_status_record(M37_MAP *m,DWORD transfer,BOOL ok,DWORD bytes,DWOR
  else m37_put(m,M38_USB_RESULT_UNAVAILABLE,transfer,0,apiError);
 }
 #endif
+#ifdef COM_DIAG39
+/* Only bounded, known configuration structures; never serial payload.
+ * Sizes/null checked before copying. Buffers are Device Manager-mapped as in
+ * serial_control. This does not probe arbitrary invalid non-null addresses. */
+static void m39_control_record(M37_MAP *m,DWORD object,DWORD code,const BYTE *in,DWORD inSize,DWORD outSize)
+{
+ DWORD word,flags;DCB d;COMMTIMEOUTS t;
+ m37_put(m,M39_REQUEST_SIZE,object,inSize,outSize);
+ if(in && inSize==4 && (code==0x001b0028 || code==0x001b0044)){
+  memcpy(&word,in,4);m37_put(m,M39_REQUEST_WORD,object,code,word);
+ }else if(in && inSize==sizeof(DCB) && code==0x001b0054){
+  memcpy(&d,in,sizeof(d));memcpy(&flags,in+8,4);
+  m37_put(m,M39_DCB_LENGTH_BAUD,object,d.DCBlength,d.BaudRate);
+  m37_put(m,M39_DCB_FLAGS_FORMAT,object,flags,d.ByteSize|((DWORD)d.Parity<<8)|((DWORD)d.StopBits<<16));
+ }else if(in && inSize==sizeof(COMMTIMEOUTS) && code==0x001b003c){
+  memcpy(&t,in,sizeof(t));
+  m37_put(m,M39_TIMEOUT_INTERVAL,object,t.ReadIntervalTimeout,0);
+  m37_put(m,M39_TIMEOUT_READ,object,t.ReadTotalTimeoutMultiplier,t.ReadTotalTimeoutConstant);
+  m37_put(m,M39_TIMEOUT_WRITE,object,t.WriteTotalTimeoutMultiplier,t.WriteTotalTimeoutConstant);
+ }
+}
+/* Caller holds port->io. known/error distinguish stale/invalid from low. */
+static void m39_line_record(M37_MAP *m,DWORD object,DWORD known,DWORD status,DWORD raw,DWORD tick,DWORD error,DWORD mask,DWORD pending)
+{
+ m37_put(m,M39_LINE_STATE,object,status,known);
+ m37_put(m,M39_LINE_SAMPLE,object,raw,(error || !known)?MAXDWORD:GetTickCount()-tick);
+ m37_put(m,M39_LINE_EVENTS,object,mask,pending);
+}
+#endif
 static LPCWSTR m37_event_name(DWORD event)
 {
  static LPCWSTR names[]={L"UNKNOWN",L"ATTACH_ENTER",L"DEVICE_INFO",L"REGISTER_BEGIN",L"REGISTER_END",L"READY",L"DETACH_ENTER",L"WORKER_JOIN_BEGIN",L"WORKER_JOIN_END",L"UNREGISTER_BEGIN",L"UNREGISTER_END",L"NOTIFY_JOIN_BEGIN",L"NOTIFY_JOIN_END",L"RX_JOIN_BEGIN",L"RX_JOIN_END",L"DEACTIVATE_BEGIN",L"DEACTIVATE_END",L"LOCK_RX_BEGIN",L"LOCK_RX_END",L"LOCK_TX_BEGIN",L"LOCK_TX_END",L"LOCK_IO_BEGIN",L"LOCK_IO_END",L"PIPE_CLOSE_BEGIN",L"PIPE_CLOSE_END",L"PORT_RELEASE_BEGIN",L"PORT_RELEASE_END",L"CLEANUP_END",L"PARENT_RELEASE_BEGIN",L"PARENT_RELEASE_END",L"DETACH_RETURN_INTENT",L"ABORT_BEGIN",L"ABORT_END",L"STATUS",L"TRANSFER_CLOSE_BEGIN",L"TRANSFER_CLOSE_END",L"RX_EXIT",L"NOTIFY_EXIT",L"RETAIN",L"ACTIVATE_BEGIN",L"ACTIVATE_END"};
  static LPCWSTR extra[]={L"USB_RESULT",L"USB_RESULT_UNAVAILABLE",L"OPEN_BEGIN",L"OPEN_END",L"CLOSE_BEGIN",L"CLOSE_END",L"READ_BEGIN",L"READ_END",L"WRITE_BEGIN",L"WRITE_END",L"IOCTL_BEGIN",L"IOCTL_END",L"RX_PUSH",L"RX_EVENTS",L"MASK_STATE",L"WAIT_BEGIN",L"WAIT_END",L"WAIT_MASK",L"TRANSFER_ISSUE",L"TRANSFER_SUBMITTED"};
  if(event>=M38_USB_RESULT && event<=M38_TRANSFER_SUBMITTED)return extra[event-M38_USB_RESULT];
+ {static LPCWSTR request[]={L"REQUEST_SIZE",L"REQUEST_WORD",L"DCB_LENGTH_BAUD",L"DCB_FLAGS_FORMAT",L"TIMEOUT_READ",L"TIMEOUT_WRITE",L"TIMEOUT_INTERVAL",L"LINE_STATE",L"LINE_SAMPLE",L"LINE_EVENTS"};
+  if(event>=M39_REQUEST_SIZE && event<=M39_LINE_EVENTS)return request[event-M39_REQUEST_SIZE];}
  return event<sizeof(names)/sizeof(names[0])?names[event]:names[0];
 }
