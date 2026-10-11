@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：V17 严格解析、部分线路状态与日志串行化
+
+首轮累计日志24条解析、同一行多tick计数0（仅有界观察，不是日志全部竞态证明）。测试完成后MI1在tick2484207报告USB error257，tick2484280 detach，双通知和双接收线程join0；异常原样保留，根因未确定，模块重启未解决。
+
+首轮实机tick2473910两端口实例17，AT/ATI4/4、150项零失败；两份snapshot均knownE0 status00 raw00 accepted11 rejected0 error0，短输出/非零输入拒绝87，标准调制解调器查询拒绝50符合预期。首次日志/测试在第二次启动前保存为driver-first/test-first。真实正线路变化尚未出现，下一轮复测仍为只读状态与AT通路，不拨号。
+
+用户继续开发。V17保留V16，新增实际10字节通知的严格解析器：A1/20、wValue0、接口匹配、wLength2、保留位校验；坏报文不覆盖原解析输出。位0/1/3映射RLSD/DSR/RING，CTS明确未知，不实现完整GetCommModemStatus、不新增非RXCHAR事件或PPP。私有IOCTL00223ff8输出8个DWORD/32字节（size/known/status/raw/accepted/rejected/tick/error），端口锁保护，未收到通知known0；有效后knownE0，拒绝计数不覆盖上次状态，线程退出清known。known仅表示最后通知能解释哪些位，不表示线路当前健康。
+
+同一DLL进程内串行化日志open/seek/stamp/message/close，DllMain初始化/释放锁，避免V16多线程交错；不保证跨进程日志互斥。notify_unit直接复用生产解析器，Joe实际32位RAPI运行tick2422104，23/23通过、无USB/串口操作；包含合成正线路值和异常报文不覆盖输出，不是物理线路验证。build_com -Version17编译、deploy_com -Version17安装成功（dll_load1 installed1 error0），V6/8/10/14/15/16/17源分支与全部PowerShell语法通过。硬件测试增加每端口6项，共150项，正在等待新进程实测结果。源码/语义/来源见scripts/COM_V17.md；focused证据evidence/2026-10-11-com-v17与2026-10-11-notify-unit，raw ATI及完整快照留本地。
+
 ## 2026-10-11：V16 中断端点只读采集，首轮138项通过
 
 第二轮独立新进程实机复测也完成：两句柄INSTANCE_VERSION16、AT/ATI4/4、138项零失败，保留首轮driver-first/test-first及第二轮driver/test。两个完整短窗口并不证明持续稳定，模块重启仍在发生。按用户授权发布本轮源码、自编诊断二进制和脱敏聚焦证据，不发布完整初始快照/raw ATI。

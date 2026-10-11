@@ -136,6 +136,13 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return FALSE;}
     logline(L"V4 IOCTL code=%08lx in=%lu out=%lu\r\n",code,inSize,outSize);
     switch(code) {
+#ifdef COM_V17
+    case M36_NOTIFY_QUERY: /* Partial state with explicit validity, NOT a modem IOCTL. */
+        if(!inSize && out && outSize==sizeof(M36_NOTIFY_STATE)) {
+            memcpy(out,&port->notifyState,sizeof(M36_NOTIFY_STATE));
+            if(actual)*actual=sizeof(M36_NOTIFY_STATE);ok=TRUE;
+        }break;
+#endif
 #ifdef COM_V8
     case 0x00223ffc: /* Private version query, not a CE serial IOCTL. */
 #ifdef COM_V9
@@ -146,7 +153,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_V14
 #ifdef COM_V15
 #ifdef COM_V16
+#ifdef COM_V17
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=17;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=16;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
 #else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=15;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif

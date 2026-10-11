@@ -3,6 +3,10 @@
 #include <windows.h>
 #include <usbdi.h>
 #include <stdarg.h>
+#ifdef COM_V17
+#include "me3630_notify_state.h"
+static CRITICAL_SECTION traceLock;
+#endif
 #ifdef STREAM_V3
 #include <devload.h>
 #endif
@@ -55,7 +59,12 @@ static void logline(LPCWSTR format,...)
 #ifdef COM_V14
 #ifdef COM_V15
 #ifdef COM_V16
+#ifdef COM_V17
+    EnterCriticalSection(&traceLock);
+    file=CreateFile(L"\\Temp\\ME3630-com-v17.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
     file=CreateFile(L"\\Temp\\ME3630-com-v16.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
 #else
     file=CreateFile(L"\\Temp\\ME3630-com-v15.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 #endif
@@ -105,6 +114,9 @@ static void logline(LPCWSTR format,...)
         WriteFile(file,text,n*sizeof(WCHAR),&bytes,NULL);
         CloseHandle(file);
     }
+#ifdef COM_V17
+    LeaveCriticalSection(&traceLock);
+#endif
 }
 
 static BOOL wait_transfer(PROBE *p,USB_TRANSFER t,DWORD timeout,LPDWORD bytes)
@@ -306,4 +318,11 @@ BOOL USBUnInstallDriver(void)
     if(unregid)unregid(L"ME3630Probe");
     FreeLibrary(usbd);return ok;
 }
-BOOL WINAPI DllMain(HANDLE module,DWORD reason,LPVOID reserved){return TRUE;}
+BOOL WINAPI DllMain(HANDLE module,DWORD reason,LPVOID reserved)
+{
+#ifdef COM_V17
+    if(reason==DLL_PROCESS_ATTACH)InitializeCriticalSection(&traceLock);
+    if(reason==DLL_PROCESS_DETACH)DeleteCriticalSection(&traceLock);
+#endif
+    return TRUE;
+}

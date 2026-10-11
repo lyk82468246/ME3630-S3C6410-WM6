@@ -9,6 +9,9 @@ typedef struct {
     USB_PIPE notify;
     HANDLE notifyThread;
     DWORD notifySize;
+#ifdef COM_V17
+    M36_NOTIFY_STATE notifyState;
+#endif
 #endif
     HANDLE active;
     CRITICAL_SECTION io;
@@ -163,6 +166,9 @@ static DWORD WINAPI worker(LPVOID param)
         if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
         port=(PORT*)LocalAlloc(LPTR,sizeof(PORT));if(!port)continue;
         port->parent=p;port->refs=1;port->index=p->iface[i];
+#ifdef COM_V17
+        port->notifyState.size=sizeof(M36_NOTIFY_STATE);
+#endif
         InterlockedIncrement(&p->refs);InitializeCriticalSection(&port->io);p->ports[i]=port;
 #ifdef COM_V7
         InitializeCriticalSection(&port->rxIO);InitializeCriticalSection(&port->txIO);
@@ -213,7 +219,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V14
 #ifdef COM_V15
 #ifdef COM_V16
+#ifdef COM_V17
+        wsprintfW(path,L"Drivers\\ME3630ComV17\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV16\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV15\\Port%lu",port->index);
 #endif
@@ -269,7 +279,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V14
 #ifdef COM_V15
 #ifdef COM_V16
+#ifdef COM_V17
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV17.dll",sizeof(L"ME3630ComV17.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV16.dll",sizeof(L"ME3630ComV16.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV15.dll",sizeof(L"ME3630ComV15.dll"));
 #endif
@@ -331,7 +345,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V14
 #ifdef COM_V15
 #ifdef COM_V16
+#ifdef COM_V17
+    logline(L"V17 READY duplex=1 queue=4096 notification_state=partial CTS=unknown\r\n");
+#else
     logline(L"V16 READY duplex=1 queue=4096 interrupt_probe=1 modem_status=unsupported\r\n");
+#endif
 #else
     logline(L"V15 READY duplex=1 queue=4096 status=1 purge=RX\r\n");
 #endif
