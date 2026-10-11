@@ -45,6 +45,10 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
    logline(L"Q_PUSH port=%lu tid=%lu ptr=%08lx bytes=%lu queued=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,bytes,p->qCount);
 #endif
    if(p->eventPending& p->eventMask)SetEvent(p->eventWake);
+#ifdef COM_DIAG38
+   LIFE(M38_RX_PUSH,p,bytes,p->qCount);
+   LIFE(M38_RX_EVENTS,p,p->eventPending,p->eventMask);
+#endif
    LeaveCriticalSection(&p->io);
   }
  }

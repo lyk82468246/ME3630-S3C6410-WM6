@@ -1,0 +1,35 @@
+D38 serial/USB investigation, Joe32-bit WMDC/RAPI, 2026-10-11
+
+Independent DLL/private38/public18. No reset/force-unload/user replug requested.
+Native isolated tests:15 ownership +33 compatibility +19 recorder =67, all pass.
+Install705688 result0 next_attach_only1. DLL SHA256:
+11FB62DB92B9651ED8DE953586796368013A88BACE9A0B3118DF969988C9FB3F
+Natural ATTACH757394, COM1/5 activation762415/762439, READY2.
+Legacy D33 build/PowerShell runner parsing passed.
+
+First guarded saved-entry dial811637..822109 elapsed10472, private38 verified.
+RasDial0; error619/connected0. USB->RX queue->EV_RXCHAR->Read6 repeatedly works.
+Example: write4 at812503, push6/wait1 at812581, read6 at812632.
+Read21 at817294, cross-thread write37 at817303..817308 suggest data handoff,
+not proof of PPP framing/negotiation. No payload retained or inferred as fact.
+Handoff rejected DCB, SetMask and modem-status query; RLSD event20 delivered.
+GetCommModemStatus001b0034 rejected50 at817306..817308. No known CTS support.
+Metadata mutation/wait rejected5 by existing ownership policy; causality unproved.
+Driver contexts close817749; USB detach825714 later than RAS failure/completion.
+First collector763658..853783: next1009,941 records,60 SKIP, dropped0.
+Last emitted1001; final8 pending records missed by original loop. Incomplete.
+
+Only observer improved: snapshot bounded batch before writing, per-batch flush,
+last scan after deadline. Installed driver unchanged. No guarantee of losslessness.
+Second observer973188..1063242: next711,dropped0,711 records,no SKIP/overwrite.
+Second guarded dial995167..1000413 elapsed5246, private38 verified,RasDial0,
+error633/connected0. USB completion5 at999405, Read fails1117; RX exits999406/407,
+Write failsUSB5/1117 at999408. Close999409, detach999473..999476,
+reattach1007380 -> READY2 at1012426. Distinct transport failure this time.
+Another observed detach1049522..1049549 -> attach1057172 -> READY2 at1062218.
+Mapping can be released/reset between observers; sequence numbers not persistent.
+
+Saved connection unchanged; only own RasDial handles hung up. No LeadCore/WMDC
+configuration changes, password read, claimed PPP projection, IP or Internet.
+Next: precise rejected mask/DCB settings, known carrier status and standard
+modem-status compatibility policy; do not fabricate unknown CTS/high carrier.

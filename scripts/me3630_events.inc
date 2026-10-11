@@ -1,6 +1,10 @@
 /* RXCHAR subset: V8 waiter owns RX; V9 waiter only observes producer events.
  * No fabricated modem-line status, EV_TXEMPTY or line-error information. */
+#ifdef COM_DIAG38
+static BOOL serial_wait_event_impl(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
+#else
 static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
+#endif
 {
  DWORD epoch,mask=0,error=0;BOOL ok=FALSE,done;
 #ifndef COM_V9
@@ -56,3 +60,12 @@ static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
  InterlockedExchange(&port->eventWaiter,0);port_release(port);
  SetLastError(error);return ok;
 }
+#ifdef COM_DIAG38
+static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
+{
+ BOOL result;DWORD error,mask=0;LIFE(M38_WAIT_BEGIN,port,0,0);
+ result=serial_wait_event_impl(port,out,outSize,actual);error=GetLastError();
+ if(result){memcpy(&mask,out,4);LIFE(M38_WAIT_MASK,port,mask,0);}
+ LIFE(M38_WAIT_END,port,result,error);return result;
+}
+#endif

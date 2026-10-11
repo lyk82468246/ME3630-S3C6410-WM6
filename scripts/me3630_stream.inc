@@ -92,7 +92,11 @@ BOOL M36_Deinit(DWORD context){port_release((PORT*)context);return TRUE;}
 #ifdef COM_DIAG34
 #include "me3630_open.inc"
 #endif
+#ifdef COM_DIAG38
+static DWORD stream_open_impl(DWORD context,DWORD access,DWORD share)
+#else
 DWORD M36_Open(DWORD context,DWORD access,DWORD share)
+#endif
 {
     PORT *port=(PORT*)context;
 #ifdef COM_DIAG33
@@ -113,7 +117,17 @@ DWORD M36_Open(DWORD context,DWORD access,DWORD share)
     return context;
 #endif
 }
+#ifdef COM_DIAG38
+DWORD M36_Open(DWORD context,DWORD access,DWORD share)
+{
+ DWORD result,error;LIFE(M38_OPEN_BEGIN,context,access,share);
+ result=stream_open_impl(context,access,share);error=result?0:GetLastError();
+ LIFE(M38_OPEN_END,context,result,error);return result;
+}
+static BOOL stream_close_impl(DWORD context)
+#else
 BOOL M36_Close(DWORD context)
+#endif
 {
 #ifdef COM_DIAG34
     M36_OPEN *open=(M36_OPEN*)context;PORT *port=open->port;
@@ -137,6 +151,15 @@ BOOL M36_Close(DWORD context)
     InterlockedExchange(&port->opened,0);port_release(port);return TRUE;
 #endif
 }
+#ifdef COM_DIAG38
+BOOL M36_Close(DWORD context)
+{
+ BOOL result;DWORD error;LIFE(M38_CLOSE_BEGIN,context,0,0);
+ result=stream_close_impl(context);error=result?0:GetLastError();
+ /* context is only an opaque key after Close; no dereference. */
+ LIFE(M38_CLOSE_END,context,result,error);return result;
+}
+#endif
 static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
 #ifdef COM_V4
@@ -162,21 +185,39 @@ static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #endif
 }
 DWORD M36_Read(DWORD context,LPVOID buffer,DWORD count){
+#ifdef COM_DIAG38
+ M36_OPEN *open=(M36_OPEN*)context;DWORD result,error;LIFE(M38_READ_BEGIN,context,count,open->port->index);
+ if(!(open->access&GENERIC_READ)){SetLastError(ERROR_ACCESS_DENIED);result=(DWORD)-1;}
+ else result=stream_io(open->port,buffer,count,TRUE);
+ error=GetLastError();LIFE(M38_READ_END,context,result,error);return result;
+#else
 #ifdef COM_DIAG34
  M36_OPEN *open=(M36_OPEN*)context;if(!(open->access&GENERIC_READ)){SetLastError(ERROR_ACCESS_DENIED);return (DWORD)-1;}return stream_io(open->port,buffer,count,TRUE);
 #else
  return stream_io((PORT*)context,buffer,count,TRUE);
 #endif
+#endif
 }
 DWORD M36_Write(DWORD context,LPCVOID buffer,DWORD count){
+#ifdef COM_DIAG38
+ M36_OPEN *open=(M36_OPEN*)context;DWORD result,error;LIFE(M38_WRITE_BEGIN,context,count,open->port->index);
+ if(!(open->access&GENERIC_WRITE)){SetLastError(ERROR_ACCESS_DENIED);result=(DWORD)-1;}
+ else result=stream_io(open->port,(LPVOID)buffer,count,FALSE);
+ error=GetLastError();LIFE(M38_WRITE_END,context,result,error);return result;
+#else
 #ifdef COM_DIAG34
  M36_OPEN *open=(M36_OPEN*)context;if(!(open->access&GENERIC_WRITE)){SetLastError(ERROR_ACCESS_DENIED);return (DWORD)-1;}return stream_io(open->port,(LPVOID)buffer,count,FALSE);
 #else
  return stream_io((PORT*)context,(LPVOID)buffer,count,FALSE);
 #endif
+#endif
 }
 DWORD M36_Seek(DWORD context,LONG distance,DWORD method){SetLastError(ERROR_NOT_SUPPORTED);return (DWORD)-1;}
+#ifdef COM_DIAG38
+static BOOL stream_control_impl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+#else
 BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+#endif
 #ifdef COM_V4
 #ifdef COM_DIAG34
 {M36_OPEN *open=(M36_OPEN*)context;if(!m36_open_allows_control(open,code)){if(actual)*actual=0;SetLastError(ERROR_ACCESS_DENIED);return FALSE;}return serial_control(open->port,code,in,inSize,out,outSize,actual);}
@@ -185,6 +226,14 @@ BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWOR
 #endif
 #else
 {if(actual)*actual=0;SetLastError(ERROR_NOT_SUPPORTED);return FALSE;}
+#endif
+#ifdef COM_DIAG38
+BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+{
+ BOOL result;DWORD error;LIFE(M38_IOCTL_BEGIN,context,code,0);
+ result=stream_control_impl(context,code,in,inSize,out,outSize,actual);error=GetLastError();
+ LIFE(M38_IOCTL_END,context,result,error);return result;
+}
 #endif
 void M36_PowerUp(DWORD context){}
 void M36_PowerDown(DWORD context){}
@@ -339,7 +388,9 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG34R2
 #ifdef COM_DIAG35
 #ifdef COM_DIAG36
-#ifdef COM_DIAG37
+#ifdef COM_DIAG38
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D38.dll",sizeof(L"ME3630ComV18D38.dll"));
+#elif defined(COM_DIAG37)
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D37.dll",sizeof(L"ME3630ComV18D37.dll"));
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D36.dll",sizeof(L"ME3630ComV18D36.dll"));

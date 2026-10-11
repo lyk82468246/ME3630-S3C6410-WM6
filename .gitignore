@@ -43,5 +43,7 @@ __pycache__/
 /evidence/2026-10-11-diag37/compat-previous-local.txt
 /evidence/2026-10-11-diag37/life-previous-local.txt
 /evidence/2026-10-11-diag37/capture-previous-local.txt
+/evidence/2026-10-11-diag38/*previous-local.txt
+/evidence/2026-10-11-diag38/ras/previous-local.txt
 # Accumulated trace; publish only the bounded stability window.
 /evidence/2026-10-11-stability/driver-v5.txt

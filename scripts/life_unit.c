@@ -33,7 +33,17 @@ void mainCRTStartup(void)
  check(L"cross_process_named_mapping",created && n==WAIT_OBJECT_0 && m37_get(first,end,&record) && record.object==0xabc && record.value==0xdef && record.pid!=GetCurrentProcessId());if(created){CloseHandle(child.hThread);CloseHandle(child.hProcess);}
  if(!joined || (created && n!=WAIT_OBJECT_0))goto done; /* Keep views alive until process exit if a test worker did not retire. */
  m37_close(first,a);first=NULL;a=NULL;check(L"observer_keeps_map_alive",m37_get(second,end,&record) || InterlockedCompareExchange(&second->next,0,0)==end);
- check(L"event_name_table",!lstrcmpW(m37_event_name(M37_DEACTIVATE_BEGIN),L"DEACTIVATE_BEGIN") && !lstrcmpW(m37_event_name(999),L"UNKNOWN"));if(joined && (!created || n==WAIT_OBJECT_0))m37_close(second,b);
+ check(L"event_name_table",!lstrcmpW(m37_event_name(M37_DEACTIVATE_BEGIN),L"DEACTIVATE_BEGIN") && !lstrcmpW(m37_event_name(999),L"UNKNOWN"));
+#ifdef COM_DIAG38
+ check(L"d38_event_name_table",!lstrcmpW(m37_event_name(M38_READ_END),L"READ_END") && !lstrcmpW(m37_event_name(M38_TRANSFER_SUBMITTED),L"TRANSFER_SUBMITTED"));
+ SetLastError(4321);m38_status_record(second,55,TRUE,6,0,0);end=InterlockedCompareExchange(&second->next,0,0);
+ check(L"usb_status_distinct_from_api",m37_get(second,end,&record) && record.event==M38_USB_RESULT && record.value==6 && record.error==0 && GetLastError()==4321);
+ m38_status_record(second,55,TRUE,0,0x1234,0);end=InterlockedCompareExchange(&second->next,0,0);
+ check(L"usb_error_preserved",m37_get(second,end,&record) && record.event==M38_USB_RESULT && record.error==0x1234);
+ m38_status_record(second,55,FALSE,99,0,6);end=InterlockedCompareExchange(&second->next,0,0);
+ check(L"failed_status_not_claimed",m37_get(second,end,&record) && record.event==M38_USB_RESULT_UNAVAILABLE && record.value==0 && record.error==6);
+#endif
+ if(joined && (!created || n==WAIT_OBJECT_0))m37_close(second,b);
 done:
  n=wsprintfW(s,L"LIFE_UNIT CHECKS=%lu FAILURES=%lu COMPLETE\r\n",checks,failures);WriteFile(logFile,s,n*2,&bytes,NULL);CloseHandle(logFile);ExitProcess(failures?1:0);
 }

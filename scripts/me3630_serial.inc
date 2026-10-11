@@ -21,6 +21,9 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
 {
     PROBE *p=port->parent;USB_TRANSFER t;DWORD start=GetTickCount(),error=USB_NOT_COMPLETE_ERROR;BOOL complete,expired=FALSE;
     *bytes=0;
+#ifdef COM_DIAG38
+    LIFE(M38_TRANSFER_ISSUE,port,size,port->index|(input?0x100:0x200));
+#endif
 #ifdef COM_DIAG35
     if(!input){
         EnterCriticalSection(&port->io);
@@ -30,6 +33,9 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
     }else
 #endif
     t=p->usb->lpIssueBulkTransfer(pipe,NULL,NULL,USB_NO_WAIT|(input?(USB_IN_TRANSFER|USB_SHORT_TRANSFER_OK):USB_OUT_TRANSFER),size,buf,0);
+#ifdef COM_DIAG38
+    LIFE(M38_TRANSFER_SUBMITTED,port,t,t?0:GetLastError());
+#endif
     if(!t){SetLastError(ERROR_IO_DEVICE);return -1;}
     while(!p->usb->lpIsTransferComplete(t)) {
         if(WaitForSingleObject(p->stop,1)==WAIT_OBJECT_0)break;
@@ -198,7 +204,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG37
+#ifdef COM_DIAG38
+            *(DWORD*)out=38;
+#elif defined(COM_DIAG37)
             *(DWORD*)out=37;
 #elif defined(COM_DIAG36)
             *(DWORD*)out=36;
@@ -277,6 +285,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #endif
 #ifdef COM_DIAG36
         ok=m36_set_event_mask(port,lines);
+#ifdef COM_DIAG38
+        LIFE(M38_MASK_STATE,port,port->eventMask,port->eventPending);
+#endif
         logline(L"D36 MASK port=%lu mask=%08lx pending=%08lx queued=%lu epoch=%lu\r\n",port->index,lines,port->eventPending,port->qCount,port->eventEpoch);
         break;
 #else

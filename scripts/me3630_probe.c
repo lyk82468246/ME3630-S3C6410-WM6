@@ -140,7 +140,12 @@ static void life_finish_transfer(PROBE *p,USB_TRANSFER t,BOOL complete,DWORD act
 {
  BOOL result;DWORD code;
  if(!complete){LIFE(M37_ABORT_BEGIN,t,actor,0);result=p->usb->lpAbortTransfer(t,0);code=result?0:GetLastError();LIFE(M37_ABORT_END,t,result,code);}
- result=p->usb->lpGetTransferStatus(t,bytes,error);code=result?0:GetLastError();LIFE(M37_STATUS,t,result,code);
+ result=p->usb->lpGetTransferStatus(t,bytes,error);code=result?0:GetLastError();
+#ifdef COM_DIAG38
+ m38_status_record(life,(DWORD)t,result,*bytes,*error,code);
+#else
+ LIFE(M37_STATUS,t,result,code);
+#endif
  LIFE(M37_TRANSFER_CLOSE_BEGIN,t,actor,0);result=p->usb->lpCloseTransfer(t);code=result?0:GetLastError();LIFE(M37_TRANSFER_CLOSE_END,t,result,code);
 }
 #endif

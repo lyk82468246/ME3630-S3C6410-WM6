@@ -1,7 +1,11 @@
 /* Change ONLY our existing exact USB match. Preserve V18 Unimodem keys. */
 #include <windows.h>
 #undef wsprintfW
-#ifdef COM_DIAG37
+#ifdef COM_DIAG38
+#define DIAG_DLL L"ME3630ComV18D38.dll"
+#define DIAG_LOG L"\\Temp\\ME3630-diag38-install.txt"
+#define DIAG_NUMBER 38
+#elif defined(COM_DIAG37)
 #define DIAG_DLL L"ME3630ComV18D37.dll"
 #define DIAG_LOG L"\\Temp\\ME3630-diag37-install.txt"
 #define DIAG_NUMBER 37
@@ -35,7 +39,7 @@ void mainCRTStartup(void)
   if(!error){size=sizeof(prior);error=RegQueryValueEx(key,L"DLL",NULL,&type,(LPBYTE)prior,&size);
    if(!error && (type!=REG_SZ || size>sizeof(prior) || size<2))error=ERROR_INVALID_DATA;
    prior[95]=0;
-   if(!error && lstrcmpiW(prior,L"ME3630ComV18.dll") && lstrcmpiW(prior,L"ME3630ComV18D33.dll") && lstrcmpiW(prior,L"ME3630ComV18D34.dll") && lstrcmpiW(prior,L"ME3630ComV18D34R2.dll") && lstrcmpiW(prior,L"ME3630ComV18D35.dll") && lstrcmpiW(prior,L"ME3630ComV18D36.dll") && lstrcmpiW(prior,DIAG_DLL))error=ERROR_INVALID_DATA;
+   if(!error && lstrcmpiW(prior,L"ME3630ComV18.dll") && lstrcmpiW(prior,L"ME3630ComV18D33.dll") && lstrcmpiW(prior,L"ME3630ComV18D34.dll") && lstrcmpiW(prior,L"ME3630ComV18D34R2.dll") && lstrcmpiW(prior,L"ME3630ComV18D35.dll") && lstrcmpiW(prior,L"ME3630ComV18D36.dll") && lstrcmpiW(prior,L"ME3630ComV18D37.dll") && lstrcmpiW(prior,DIAG_DLL))error=ERROR_INVALID_DATA;
    if(!error)error=RegSetValueEx(key,L"DLL",0,REG_SZ,(LPBYTE)DIAG_DLL,sizeof(DIAG_DLL));
    RegCloseKey(key);
   }

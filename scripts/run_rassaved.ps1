@@ -1,4 +1,4 @@
-param([switch]$Dial,[switch]$BuildOnly)
+param([switch]$Dial,[switch]$BuildOnly,[ValidateSet(0,38)][int]$ExpectedDiagnostic=0,[string]$OutDir)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -13,6 +13,7 @@ $match=[regex]::Match($source,"(?s)\`$rapiSource = @'\r?\n(.*?)\r?\n'@")
 if(!$match.Success){throw 'RAPI helper missing'}
 Add-Type -TypeDefinition $match.Groups[1].Value
 $out=Join-Path $PSScriptRoot '..\evidence\2026-10-11-ras-saved'
+if($OutDir){$out=[IO.Path]::GetFullPath($OutDir)}
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $target=if($Dial){'dial.txt'}else{'inspect.txt'}
 $deviceLog='\Temp\ME3630-ras-saved.txt'
@@ -23,6 +24,7 @@ try {
  $exe='\Temp\ME3630-ras-saved-'+[DateTime]::Now.ToString('HHmmss')+'.exe'
  [PositronDeviceRapi]::CopyFileToDevice("$build\ras_saved.exe",$exe)
  $argsText=if($Dial){'--dial'}else{$null}
+ if($ExpectedDiagnostic -eq 38){$argsText=($argsText+' --require-d38').Trim()}
  $remotePid=[PositronDeviceRapi]::LaunchProcess($exe,'\Temp',$argsText);Write-Output "SAVED_PID=$remotePid"
  $deadline=[DateTime]::UtcNow.AddSeconds(65);$finished=$false
  do {

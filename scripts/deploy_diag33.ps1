@@ -1,4 +1,4 @@
-param([switch]$BuildOnly,[switch]$Version34,[switch]$Revision2,[switch]$Version35,[switch]$Version36,[switch]$Version37)
+param([switch]$BuildOnly,[switch]$Version34,[switch]$Revision2,[switch]$Version35,[switch]$Version36,[switch]$Version37,[switch]$Version38)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -6,11 +6,13 @@ $cl='C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\ce\bin\x86_arm\cl.exe
 $build=Join-Path $PSScriptRoot '..\build'
 $diag=if($Version34){34}else{33}
 if($Revision2){if(!$Version34){throw 'Revision2 requires Version34'};$diag='34R2'}
+if($Version38){if($Version34 -or $Revision2 -or $Version35 -or $Version36 -or $Version37){throw 'Select Version38 alone'};$Version37=$true}
 if($Version37){if($Version34 -or $Revision2 -or $Version35 -or $Version36){throw 'Select Version37 alone'};$Version36=$true}
 if($Version36){if($Version34 -or $Revision2 -or $Version35){throw 'Select Version36 alone'};$Version35=$true}
 if($Version35){if($Version34 -or $Revision2){throw 'Select Version35 alone'};$Version34=$true;$Revision2=$true;$diag=35}
 if($Version36){$diag=36}
 if($Version37){$diag=37}
+if($Version38){$diag=38}
 $flags=@('/nologo','/TC','/O1','/GS-','/DUNICODE','/D_UNICODE','/DUNDER_CE','/D_WIN32_WCE=0x502','/DARM','/D_ARM_',"/I$sdk\Include\Armv4i")
 $driverFlags=$flags+@('/DSTREAM_V3','/DCOM_V4','/DCOM_DIAG33');for($n=5;$n -le 18;$n++){$driverFlags+="/DCOM_V$n"}
 if($Version34){$driverFlags+='/DCOM_DIAG34';$flags+='/DCOM_DIAG34'}
@@ -18,6 +20,7 @@ if($Revision2){$driverFlags+='/DCOM_DIAG34R2';$flags+='/DCOM_DIAG34R2'}
 if($Version35){$driverFlags+='/DCOM_DIAG35';$flags+='/DCOM_DIAG35'}
 if($Version36){$driverFlags+='/DCOM_DIAG36';$flags+='/DCOM_DIAG36'}
 if($Version37){$driverFlags+='/DCOM_DIAG37';$flags+='/DCOM_DIAG37'}
+if($Version38){$driverFlags+='/DCOM_DIAG38';$flags+='/DCOM_DIAG38'}
 & $cl @driverFlags "/Fo$build\me3630_diag$diag.obj" "/Fe$build\ME3630ComV18D$diag.dll" "$PSScriptRoot\me3630_probe.c" /link /DLL /NODEFAULTLIB /ENTRY:DllMain /SUBSYSTEM:WINDOWSCE,5.02 "/DEF:$PSScriptRoot\me3630_com.def" "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'D33 driver build failed'}
 & $cl @flags "/Fo$build\install_diag$diag.obj" "/Fe$build\install_diag$diag.exe" "$PSScriptRoot\install_diag33.c" /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWSCE,5.02 "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
@@ -33,7 +36,8 @@ if($Version35){
 }
 if($Version37){
  foreach($program in @('life_unit','life_capture')){
-  & $cl @flags "/Fo$build\$program.obj" "/Fe$build\$program.exe" "$PSScriptRoot\$program.c" /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWSCE,5.02 "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
+  $lifeBinary=if($Version38){$program+'_d38'}else{$program}
+  & $cl @flags "/Fo$build\$lifeBinary.obj" "/Fe$build\$lifeBinary.exe" "$PSScriptRoot\$program.c" /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWSCE,5.02 "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
   if($LASTEXITCODE -ne 0){throw "Lifecycle tool build failed: $program"}
  }
 }
@@ -82,13 +86,15 @@ try {
   $priorLife=$null
   if([PositronDeviceRapi]::TryCopyFileFromDevice('\Temp\ME3630-life-unit.txt',"$out\life-previous-local.txt")){$priorLife=[regex]::Match((Get-Content "$out\life-previous-local.txt" -Encoding Unicode -Raw),'start_tick=(\d+)').Groups[1].Value}
   $lifeExe='\Temp\ME3630-life-unit-'+[DateTime]::Now.ToString('HHmmss')+'.exe'
-  [PositronDeviceRapi]::CopyFileToDevice("$build\life_unit.exe",$lifeExe)
+  $lifeUnitBinary=if($Version38){'life_unit_d38'}else{'life_unit'}
+  [PositronDeviceRapi]::CopyFileToDevice("$build\$lifeUnitBinary.exe",$lifeExe)
   $lifePid=[PositronDeviceRapi]::LaunchProcess($lifeExe,'\Temp',$null);Write-Output "LIFE_UNIT_PID=$lifePid"
   Start-Sleep -Seconds 2
   if(![PositronDeviceRapi]::TryCopyFileFromDevice('\Temp\ME3630-life-unit.txt',"$out\life-unit.txt")){throw 'Lifecycle unit evidence missing'}
   $lifeResult=Get-Content "$out\life-unit.txt" -Encoding Unicode -Raw;Write-Output $lifeResult
   $lifeStart=[regex]::Match($lifeResult,'start_tick=(\d+)')
-  if(!$lifeStart.Success -or ($null -ne $priorLife -and $lifeStart.Groups[1].Value -eq $priorLife) -or $lifeResult -notmatch 'LIFE_UNIT CHECKS=15 FAILURES=0 COMPLETE'){throw 'Lifecycle test failed or not fresh; no driver installed'}
+  $lifeChecks=if($Version38){19}else{15}
+  if(!$lifeStart.Success -or ($null -ne $priorLife -and $lifeStart.Groups[1].Value -eq $priorLife) -or $lifeResult -notmatch "LIFE_UNIT CHECKS=$lifeChecks FAILURES=0 COMPLETE"){throw 'Lifecycle test failed or not fresh; no driver installed'}
  }
  [PositronDeviceRapi]::CopyFileToDevice("$build\ME3630ComV18D$diag.dll","\Windows\ME3630ComV18D$diag.dll")
  $exe="\Temp\ME3630-install-d$diag-"+[DateTime]::Now.ToString('HHmmss')+'.exe'
