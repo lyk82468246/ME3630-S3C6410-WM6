@@ -1,0 +1,15 @@
+# Original third-party driver packages stay local.
+/vendor/
+
+# Intermediate compiler products.
+/build/*.obj
+/build/*.lib
+/build/*.exp
+__pycache__/
+
+# Full device inventories remain local; publish focused results and USB traces.
+/evidence/**/registry.txt
+/evidence/**/windows-files.json
+/evidence/**/directories.txt
+/evidence/**/USBDeviceInfo.txt
+/evidence/**/usb-config-before/

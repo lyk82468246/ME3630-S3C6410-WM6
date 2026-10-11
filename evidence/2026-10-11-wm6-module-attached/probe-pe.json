@@ -1,0 +1,71 @@
+[
+  {
+    "path": ".\\build\\ME3630Probe.dll",
+    "sha256": "78badde87d3f87fab3ffd2f263842a1b434fb2a5da8eb46076933c876b3fc2d8",
+    "machine": "0x1c2",
+    "os_version": [
+      5,
+      2
+    ],
+    "subsystem": 9,
+    "subsystem_version": [
+      5,
+      2
+    ],
+    "imports": {
+      "COREDLL.dll": [
+        "#494",
+        "#553",
+        "#171",
+        "#173",
+        "#168",
+        "#57",
+        "#497",
+        "#516",
+        "#535",
+        "#36",
+        "#492",
+        "#495",
+        "#33",
+        "#1044",
+        "#529",
+        "#1047",
+        "#530",
+        "#528"
+      ]
+    },
+    "exports": {
+      "USBDeviceAttach": 1,
+      "USBInstallDriver": 2,
+      "USBUnInstallDriver": 3
+    }
+  },
+  {
+    "path": ".\\build\\install_usb_probe.exe",
+    "sha256": "fb07e814d5741797c8ee16780b1aaf4884c2ad5b89334510dc7834ccc2023b2d",
+    "machine": "0x1c2",
+    "os_version": [
+      5,
+      2
+    ],
+    "subsystem": 9,
+    "subsystem_version": [
+      5,
+      2
+    ],
+    "imports": {
+      "COREDLL.dll": [
+        "#544",
+        "#553",
+        "#171",
+        "#56",
+        "#168",
+        "#529",
+        "#530",
+        "#516",
+        "#528"
+      ]
+    },
+    "exports": {}
+  }
+]

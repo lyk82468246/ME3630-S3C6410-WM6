@@ -1,0 +1,44 @@
+[
+  {
+    "path": ".\\build\\ME3630ProbeV2.dll",
+    "sha256": "a26804eae689e4dc1658ad9788875cd9bb805522bc221e56d2f296c24575ddc4",
+    "machine": "0x1c2",
+    "os_version": [
+      5,
+      2
+    ],
+    "subsystem": 9,
+    "subsystem_version": [
+      5,
+      2
+    ],
+    "imports": {
+      "COREDLL.dll": [
+        "#494",
+        "#553",
+        "#171",
+        "#56",
+        "#535",
+        "#173",
+        "#168",
+        "#57",
+        "#497",
+        "#516",
+        "#1047",
+        "#36",
+        "#492",
+        "#495",
+        "#33",
+        "#1044",
+        "#529",
+        "#530",
+        "#528"
+      ]
+    },
+    "exports": {
+      "USBDeviceAttach": 1,
+      "USBInstallDriver": 2,
+      "USBUnInstallDriver": 3
+    }
+  }
+]

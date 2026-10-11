@@ -1,0 +1,5 @@
+LIBRARY ME3630Probe
+EXPORTS
+    USBDeviceAttach
+    USBInstallDriver
+    USBUnInstallDriver
