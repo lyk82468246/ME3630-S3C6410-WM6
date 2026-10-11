@@ -1,4 +1,4 @@
-param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10)
+param([switch]$PullOnly,[switch]$Test,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14)
 $ErrorActionPreference='Stop'
 if([Environment]::Is64BitProcess){throw 'Use 32-bit PowerShell'}
 $source=Get-Content 'C:\Users\Joe\Documents\C#\Positron\scripts\device_gate.ps1' -Raw
@@ -11,6 +11,10 @@ if($Version7){if($Version5 -or $Version6){throw 'Select a single version'};$vers
 if($Version8){if($Version5 -or $Version6 -or $Version7){throw 'Select a single version'};$version=8}
 if($Version9){if($Version5 -or $Version6 -or $Version7 -or $Version8){throw 'Select a single version'};$version=9}
 if($Version10){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9){throw 'Select a single version'};$version=10}
+if($Version11){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10){throw 'Select a single version'};$version=11}
+if($Version12){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11){throw 'Select a single version'};$version=12}
+if($Version13){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12){throw 'Select a single version'};$version=13}
+if($Version14){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13){throw 'Select a single version'};$version=14}
 $out=Join-Path $PSScriptRoot "..\evidence\2026-10-11-com-v$version"
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $testLog='\Temp\ME3630-com-test.txt';if($Version5){$testLog='\Temp\ME3630-com-test-v5.txt'}
@@ -19,11 +23,15 @@ if($Version7){$testLog='\Temp\ME3630-com-test-v7.txt'}
 if($Version8){$testLog='\Temp\ME3630-com-test-v8.txt'}
 if($Version9){$testLog='\Temp\ME3630-com-test-v9.txt'}
 if($Version10){$testLog='\Temp\ME3630-com-test-v10.txt'}
+if($Version11){$testLog='\Temp\ME3630-com-test-v11.txt'}
+if($Version12){$testLog='\Temp\ME3630-com-test-v12.txt'}
+if($Version13){$testLog='\Temp\ME3630-com-test-v13.txt'}
+if($Version14){$testLog='\Temp\ME3630-com-test-v14.txt'}
 $previousStart=$null
 try {
  [PositronDeviceRapi]::Connect()
  if($Test) {
-  if($Version7 -or $Version8 -or $Version9 -or $Version10) {
+  if($version -ge 7) {
    # Registration does not replace an already active V6 instance. Wait for an
    # actual V7 activation marker, not merely a successful installer return.
    $readyDeadline=[DateTime]::UtcNow.AddSeconds(40);$ready=$false
@@ -65,6 +73,10 @@ try {
   if($Version8){$expectedChecks=68}
   if($Version9){$expectedChecks=102}
   if($Version10){$expectedChecks=102}
+  if($Version11){$expectedChecks=102}
+  if($Version12){$expectedChecks=102}
+  if($Version13){$expectedChecks=102}
+  if($Version14){$expectedChecks=102}
   if($Test -and $redacted -notmatch "COMMANDS_PASSED=4/4 CONTROL_CHECKS=$expectedChecks FAILURES=0 COMPLETE"){throw "V$version test did not pass all checks"}
  } elseif($Test){throw 'Test result missing'}
 } finally {[PositronDeviceRapi]::Disconnect()}

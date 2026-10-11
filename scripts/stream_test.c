@@ -68,7 +68,23 @@ void mainCRTStartup(void)
 #ifdef COM_V8
 #ifdef COM_V9
 #ifdef COM_V10
+#ifdef COM_V11
+#ifdef COM_V12
+#ifdef COM_V13
+#ifdef COM_V14
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v14.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v13.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
+#else
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v12.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
+#else
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v11.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v10.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v9.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif
@@ -128,6 +144,18 @@ void mainCRTStartup(void)
                 expectedVersion=9;
 #ifdef COM_V10
                 expectedVersion=10;
+#ifdef COM_V11
+                expectedVersion=11;
+#ifdef COM_V12
+                expectedVersion=12;
+#ifdef COM_V13
+                expectedVersion=13;
+#ifdef COM_V14
+                expectedVersion=14;
+#endif
+#endif
+#endif
+#endif
 #endif
 #endif
                 if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,sizeof(version),&actual,NULL) || version!=expectedVersion || actual!=4){CloseHandle(port);port=INVALID_HANDLE_VALUE;error=ERROR_REVISION_MISMATCH;}

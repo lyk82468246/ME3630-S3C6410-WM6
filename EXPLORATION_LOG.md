@@ -1,5 +1,41 @@
 # 探索记录
 
+## 2026-10-11：V14 第三轮完整通过，保存并发接收里程碑
+
+第三轮新tick945045，两端口INSTANCE_VERSION14：4/4命令、102项、FAILURES0 COMPLETE。duplex读332/437ms，写18/114ms；同时事件/读取读182/164ms、事件389/372ms，均完整6字节。第一与第三轮完整通过，第二轮被模块重启打断失败；不称为连续通过/稳定拨号。真实失败证据与所有独立版本源码/二进制一起保存发布，原始ATI/完整注册清单仅本地。V6-V14相关分支语法检查、PowerShell语法及日志标识脱敏检查通过。下一步继续处理模块重启与未实现的线路状态/错误/purge/流控；仍未拨号。
+
+## 2026-10-11：V14 第二轮被重启打断，不计为完整通过
+
+复测tick875248：COMMANDS_PASSED2/4 CONTROL_CHECKS97 FAILURES26 COMPLETE。COM1 tick875256打开实例14，RX_EXIT875659/DETACH875700在控制阶段发生，之后同句柄操作失败；COM5在889007打开新枚举实例14，duplex331ms、同时读168ms均6字节，其事件/未读缓冲检查通过。第二轮test-second-attempt/driver-second-attempt保留，不声称连续通过，也不自动重新打开句柄让失败测试“变绿”。再次启动一次有界复测，结果后续记。
+
+## 2026-10-11：V14 独立接收队列/事件并发首次全部通过
+
+V14第一轮新tick790449，两端口INSTANCE_VERSION14 bytes4：COMMANDS_PASSED4/4 CONTROL_CHECKS102 FAILURES0 COMPLETE。COM1/COM5后台duplex读取336/338ms均完整6字节；同时事件/读取中的读寿命166/169ms、事件372/375ms；未读缓冲排空88/85ms。350ms空读期限仍通过，不随USB接收泵5000ms延长。安装与真实DLL SHA256=dc781f4093983e13e020b2859bd697348c40169e168fb116cfe3270b66fe21c6。证据evidence/2026-10-11-com-v14，首轮test-first-attempt/driver-first-attempt另存，均ATI脱敏。
+
+V13仅改变发送缓冲位置未改善，V14再降低空闲USB取消频率后六项并发失败消失，支持频繁取消是重要诱因，但未确定具体OHCI/USB/固件机制或所有竞态安全。成功区间之外仍有模块重启/DETACH，不宣称长期稳定或可拨号。线路状态/中断解析、purge、流控、PPP仍未实现。本轮随后启动独立复测，新start_tick与实际实例版本再次核验，结果后续补记。没有改变SIM/RF/APN/IMEI/供电或无关驱动。
+
+## 2026-10-11：V13 发送缓冲对照未改善，V14 对照接收取消频率
+
+V13两端口实例13，4/4命令、102项、FAILURES6 COMPLETE；两个未读缓冲回归通过，六项并发问题仍复现。发送缓冲移至驱动持有的PORT内存没有解决观察到的失败。DLL SHA256=f11e0414a74f3e6a7c9eb958d4c88013a84c9957921f0e90a98fd42ba2689894，证据evidence/2026-10-11-com-v13。保留实验，不将它写成映射/缓存修复。
+
+V14只将后台USB读取期限200ms改为5000ms，减少空闲取消/重发频率；应用ReadFile仍由队列独立执行350ms/2000ms等期限。USB循环仍检查stop，清理引用/join策略不变。独立文件/实例/注册路径，保留V13。安装dll_load1 installed1 error0；测试结果另记。没有发送模块复位、拨号或改变SIM/RF/APN/供电策略。
+
+## 2026-10-11：V11/V12 排除部分假设，V13 对照发送缓冲位置
+
+V11 tick313180：两端口实例11、4/4命令、102项、FAILURES6 COMPLETE。生产者/读取线程均当前进程1310334926、优先级251；已记录首次等待为正常超时0x102或成功0，无Wait/ResetEvent失败报告。这只排除已采样的无效事件假设，不证明每次等待均正常。证据evidence/2026-10-11-com-v11。未盲目提升线程优先级。
+
+V12增加原子pumpPhase/pumpCycles/pumpTimeouts，读取前后快照及TX内容是否等于AT+CR，不记录任意payload。4/4命令、102项、FAILURES12 COMPLETE，仍有并发和额外backlog/掉线失败。COM5并发区间cycles6/timeouts4变为26/24，发送tick515394 expected_AT1；说明该期间生产者并非不运行，而是在不断返回接收超时。尚不能证明模块收到USB输出。DLL SHA256=bf30a67563f49fb2aafef067427561e7205de37d352564b597913d8529b95715。证据evidence/2026-10-11-com-v12，未放宽断言。
+
+V13单变量实验：发送staging从调用线程栈移动至PORT中512字节txStage，由已有txIO串行化，接收/事件/USB协议保持。独立文件与注册路径，保留V12；安装dll_load1 installed1 error0。仅测试缓冲地址/上下文相关假设，未确认映射或缓存一致性根因，没有自行调用缺乏核验的权限/缓存API。实机结果另记。
+
+## 2026-10-11：用户重启后 V10 恢复枚举，继续 V11 等待诊断
+
+用户确认手动完成此前建议的操作，按已软重启WM6处理；未由脚本执行复位。Joe实际32位RAPI读取Active确认COM1/COM5均Drivers/ME3630ComV10，Host HCD1仍活动。deploy_com.ps1 -Version10 -Test启动新tick112587，两端口INSTANCE_VERSION10；4/4 AT/ATI、102项、FAILURES11 COMPLETE。六个并发接收失败复现；COM1在RX_EXIT122378/DETACH122424之后又增加五个backlog错误。COM5未读缓冲回归通过，不能将所有失败归因于掉线。
+
+V10 Q日志里生产者/读取指针一致，但待决后台读期间没有Q_PUSH；COM1读113538-117551、COM5读136870-140884各两次返回0。随后wait-then-read在117849/141186收到6字节入队并完整读出，未见已正确入队的回复被ring_pop丢失。仍可能涉及USB输入/调度/取消/调用上下文，尚无根因证明。证据evidence/2026-10-11-com-v10/driver.txt、test.txt，ATI脱敏，原始留本地。
+
+新增独立V11诊断版，保留V10：记录接收泵和调用线程的进程/线程优先级、首次Wait返回值，ResetEvent/Wait失败明确返回错误，避免无效等待静默循环。不调整优先级、不改变USB协议。安装dll_load1 installed1 error0；DLL SHA256=b34417e85a55eaf1044d2df362a2dedc2d32990940c7da63d92f638a24ab2b78。V11实机测试结果后续记录，不以安装成功代替通过。
+
 ## 2026-10-11：V9 并发失败、V10 等待枚举、队列隔离实机通过
 
 用户要求继续开发、及时推送。新增 me3630_ring.inc、me3630_queue.inc：每端口后台接收泵与4096字节环形队列，ReadFile和WaitCommEvent分离等待；200ms有界USB接收，不覆盖未读本地数据。增加接收线程引用及拔出join，保留旧版本。构建/部署脚本支持V9/V10、验证实例版本和新start_tick。queue_test.inc复用生产ring，增加6项环形队列及每端口14项并发/未读缓冲回归，目标102项。

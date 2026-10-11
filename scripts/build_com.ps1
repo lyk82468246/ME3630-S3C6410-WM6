@@ -1,4 +1,4 @@
-param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10)
+param([switch]$TestsOnly,[switch]$Version5,[switch]$Version6,[switch]$Version7,[switch]$Version8,[switch]$Version9,[switch]$Version10,[switch]$Version11,[switch]$Version12,[switch]$Version13,[switch]$Version14)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -12,6 +12,10 @@ if($Version7){if($Version5 -or $Version6){throw 'Select a single version'};$vers
 if($Version8){if($Version5 -or $Version6 -or $Version7){throw 'Select a single version'};$version=8;$flags+=@('/DCOM_V5','/DCOM_V6','/DCOM_V7','/DCOM_V8')}
 if($Version9){if($Version5 -or $Version6 -or $Version7 -or $Version8){throw 'Select a single version'};$version=9;$flags+=@('/DCOM_V5','/DCOM_V6','/DCOM_V7','/DCOM_V8','/DCOM_V9')}
 if($Version10){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9){throw 'Select a single version'};$version=10;$flags+=@('/DCOM_V5','/DCOM_V6','/DCOM_V7','/DCOM_V8','/DCOM_V9','/DCOM_V10')}
+if($Version11){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10){throw 'Select a single version'};$version=11;$flags+=@('/DCOM_V5','/DCOM_V6','/DCOM_V7','/DCOM_V8','/DCOM_V9','/DCOM_V10','/DCOM_V11')}
+if($Version12){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11){throw 'Select a single version'};$version=12;for($n=5;$n -le 12;$n++){$flags+="/DCOM_V$n"}}
+if($Version13){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12){throw 'Select a single version'};$version=13;for($n=5;$n -le 13;$n++){$flags+="/DCOM_V$n"}}
+if($Version14){if($Version5 -or $Version6 -or $Version7 -or $Version8 -or $Version9 -or $Version10 -or $Version11 -or $Version12 -or $Version13){throw 'Select a single version'};$version=14;for($n=5;$n -le 14;$n++){$flags+="/DCOM_V$n"}}
 if(!$TestsOnly) {
 & $cl @flags /DSTREAM_V3 /DCOM_V4 "/Fo$build\me3630_com_v$version.obj" "/Fe$build\ME3630ComV$version.dll" "$PSScriptRoot\me3630_probe.c" /link /DLL /NODEFAULTLIB /ENTRY:DllMain /SUBSYSTEM:WINDOWSCE,5.02 "/DEF:$PSScriptRoot\me3630_com.def" "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'COM DLL build failed'}

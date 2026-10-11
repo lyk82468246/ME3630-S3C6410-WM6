@@ -1,4 +1,4 @@
-# V10 diagnostic build: installed, USB activation not yet verified
+# V10 diagnostic build: activated after WM6 reset; hardware suite FAILED
 
 V10 inherits the V9 receive queue unchanged. It adds Q_PUSH, Q_READ_BEGIN,
 Q_POP and Q_READ_END records with port, thread ID, transient context pointer,
@@ -42,3 +42,21 @@ then correlate producer/read diagnostics during the 102-check suite. A WM6
 soft reset may be needed to distinguish a stuck Host state, but is not done
 without user approval because it interrupts WMDC and other device programs.
 No APN, RF, SIM, IMEI, LeadCore, WMDC or power policy changes were made.
+
+## Follow-up after user performed WM6 reset
+
+Active registry now confirms COM1/COM5 use V10. Fresh native run tick112587
+verified instance10 on both ports: 4/4 AT/ATI, 102 checks, 11 failures COMPLETE.
+The same six concurrent-receive failures recur; five additional COM1 backlog
+failures follow RX failure/detach at tick122378/122424. COM5 backlog passed.
+Do not attribute the six reproducible failures solely to that detach.
+
+Queue diagnostics show matching context pointers for producers/readers and no
+Q_PUSH during failed background-read intervals. COM1 reads 113538-117551 and
+COM5 136870-140884 each return zero twice; subsequent wait-then-read receives
+six bytes (Q_PUSH117849 /141186). Therefore no evidence yet that a correctly
+queued reply is lost by ring_pop. This does not distinguish missing USB input,
+producer starvation, transfer cancellation or caller-context interactions.
+V11 checks wait outcomes and reports process/thread priorities without changing
+priority or USB protocol. Full diagnostics and redacted test are in this folder's
+corresponding evidence/2026-10-11-com-v10 directory.

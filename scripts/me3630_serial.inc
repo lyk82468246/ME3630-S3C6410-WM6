@@ -39,7 +39,12 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
 #endif
 static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
-    DWORD start,limit,total=0,n,bytes;BOOL first;int result;BYTE stage[512];
+    DWORD start,limit,total=0,n,bytes;BOOL first;int result;
+#ifdef COM_V13
+    BYTE *stage=port->txStage;
+#else
+    BYTE stage[512];
+#endif
 #ifdef COM_V7
     CRITICAL_SECTION *direction=input?&port->rxIO:&port->txIO;
 #endif
@@ -82,8 +87,11 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #endif
             }
         } else {
-            bytes=count-total;if(bytes>sizeof(stage))bytes=sizeof(stage);
+            bytes=count-total;if(bytes>512)bytes=512;
             memcpy(stage,(PBYTE)buffer+total,bytes);
+#ifdef COM_V12
+            logline(L"Q_TX port=%lu tid=%lu size=%lu expected_AT=%lu phase=%ld cycles=%ld timeouts=%ld\r\n",port->index,GetCurrentThreadId(),bytes,bytes==3 && memcmp(stage,"AT\r",3)==0,port->pumpPhase,port->pumpCycles,port->pumpTimeouts);
+#endif
             result=serial_transfer(port,port->out,stage,bytes,FALSE,limit-n,&bytes);
             if(result==1)total+=bytes;
         }
@@ -123,7 +131,23 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     case 0x00223ffc: /* Private version query, not a CE serial IOCTL. */
 #ifdef COM_V9
 #ifdef COM_V10
+#ifdef COM_V11
+#ifdef COM_V12
+#ifdef COM_V13
+#ifdef COM_V14
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=14;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=13;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
+#else
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=12;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
+#else
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=11;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=10;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
 #else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=9;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif
