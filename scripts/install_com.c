@@ -1,0 +1,28 @@
+#include <windows.h>
+#undef wsprintfW
+typedef BOOL (*INSTALL)(LPCWSTR);
+typedef BOOL (*UNINSTALL)(void);
+#ifdef COM_V5
+#define NEW_DLL L"ME3630ComV5.dll"
+#define OLD_DLL L"ME3630ComV4.dll"
+#define RESULT_PATH L"\\Temp\\ME3630-install-v5.txt"
+#else
+#define NEW_DLL L"ME3630ComV4.dll"
+#define OLD_DLL L"ME3630StreamV3.dll"
+#define RESULT_PATH L"\\Temp\\ME3630-install-v4.txt"
+#endif
+void mainCRTStartup(void)
+{
+ HMODULE dll=LoadLibrary(NEW_DLL),old;INSTALL install;UNINSTALL uninstall;
+ BOOL ok=FALSE;DWORD error=dll?0:GetLastError(),bytes;HANDLE file;WCHAR text[256];int n;
+ if(dll) {
+  old=LoadLibrary(OLD_DLL);
+  if(old){uninstall=(UNINSTALL)GetProcAddressW(old,L"USBUnInstallDriver");if(uninstall)uninstall();FreeLibrary(old);}
+  install=(INSTALL)GetProcAddressW(dll,L"USBInstallDriver");if(install)ok=install(NEW_DLL);
+  if(!ok){error=GetLastError();old=LoadLibrary(OLD_DLL);if(old){install=(INSTALL)GetProcAddressW(old,L"USBInstallDriver");if(install)install(OLD_DLL);FreeLibrary(old);}}
+  FreeLibrary(dll);
+ }
+ file=CreateFile(RESULT_PATH,GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+ if(file!=INVALID_HANDLE_VALUE){n=wsprintfW(text,L"dll_load=%lu installed=%lu error=%lu COMPLETE\r\n",dll!=NULL,ok,error);WriteFile(file,text,n*2,&bytes,NULL);CloseHandle(file);}
+ ExitProcess(ok?0:1);
+}

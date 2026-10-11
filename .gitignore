@@ -15,3 +15,5 @@ __pycache__/
 /evidence/**/usb-config-before/
 # ATI includes the module identifier. Keep raw responses local.
 /evidence/2026-10-11-stream-v3/test-raw.txt
+/evidence/2026-10-11-com-v4/test-raw.txt
+/evidence/2026-10-11-com-v5/test-raw.txt

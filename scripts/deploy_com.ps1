@@ -1,0 +1,35 @@
+param([switch]$PullOnly,[switch]$Test,[switch]$Version5)
+$ErrorActionPreference='Stop'
+if([Environment]::Is64BitProcess){throw 'Use 32-bit PowerShell'}
+$source=Get-Content 'C:\Users\Joe\Documents\C#\Positron\scripts\device_gate.ps1' -Raw
+$match=[regex]::Match($source,"(?s)\`$rapiSource = @'\r?\n(.*?)\r?\n'@")
+if(!$match.Success){throw 'RAPI helper missing'}
+Add-Type -TypeDefinition $match.Groups[1].Value
+$version=4;if($Version5){$version=5}
+$out=Join-Path $PSScriptRoot "..\evidence\2026-10-11-com-v$version"
+New-Item -ItemType Directory -Path $out -Force | Out-Null
+try {
+ [PositronDeviceRapi]::Connect()
+ if($Test) {
+  $exe='\Temp\ME3630-com-test-'+[DateTime]::Now.ToString('HHmmss')+'.exe'
+  [PositronDeviceRapi]::CopyFileToDevice((Join-Path $PSScriptRoot "..\build\com_test_v$version.exe"),$exe)
+  $remotePid=[PositronDeviceRapi]::LaunchProcess($exe,'\Temp',$null);Write-Output "TEST_PID=$remotePid"
+  Start-Sleep -Seconds 50
+ } elseif(!$PullOnly) {
+  [PositronDeviceRapi]::CopyFileToDevice((Join-Path $PSScriptRoot "..\build\ME3630ComV$version.dll"),"\Windows\ME3630ComV$version.dll")
+  $exe='\Temp\ME3630-install-v4-'+[DateTime]::Now.ToString('HHmmss')+'.exe'
+  [PositronDeviceRapi]::CopyFileToDevice((Join-Path $PSScriptRoot "..\build\install_com_v$version.exe"),$exe)
+  $remotePid=[PositronDeviceRapi]::LaunchProcess($exe,'\Temp',$null);Write-Output "INSTALL_PID=$remotePid"
+  Start-Sleep -Seconds 2
+  if(![PositronDeviceRapi]::TryCopyFileFromDevice("\Temp\ME3630-install-v$version.txt","$out\install.txt")){throw 'Install result missing'}
+  $result=Get-Content "$out\install.txt" -Encoding Unicode -Raw;Write-Output $result
+  if($result -notmatch 'installed=1'){throw "V$version install failed"}
+ }
+ if([PositronDeviceRapi]::TryCopyFileFromDevice("\Temp\ME3630-com-v$version.txt","$out\driver.txt")){Get-Content "$out\driver.txt" -Encoding Unicode -Tail 50}
+ $testLog='\Temp\ME3630-com-test.txt';if($Version5){$testLog='\Temp\ME3630-com-test-v5.txt'}
+ if([PositronDeviceRapi]::TryCopyFileFromDevice($testLog,"$out\test-raw.txt")) {
+  $redacted=(Get-Content "$out\test-raw.txt" -Encoding Unicode -Raw) -replace '(?im)(IMEI\s*:\s*)[0-9]+','$1[REDACTED]'
+  $redacted | Set-Content "$out\test.txt" -Encoding Unicode;Write-Output $redacted
+  if($Test -and $redacted -notmatch 'COMMANDS_PASSED=4/4 CONTROL_CHECKS=32 FAILURES=0 COMPLETE'){throw "V$version test did not pass all checks"}
+ } elseif($Test){throw 'Test result missing'}
+} finally {[PositronDeviceRapi]::Disconnect()}

@@ -9,6 +9,12 @@ typedef struct {
     CRITICAL_SECTION io;
     LONG refs,opened;
     DWORD index;
+#ifdef COM_V4
+    DCB dcb;
+    COMMTIMEOUTS timeouts;
+    DWORD lines,rxPos,rxLen;
+    BYTE rx[512];
+#endif
 } PORT;
 static void probe_release(PROBE *p)
 {
@@ -24,6 +30,9 @@ static void port_release(PORT *port)
         DeleteCriticalSection(&port->io);LocalFree(port);probe_release(p);
     }
 }
+#ifdef COM_V4
+#include "me3630_serial.inc"
+#endif
 DWORD M36_Init(DWORD context)
 {
     HKEY key;DWORD ptr=0,size=sizeof(ptr),type;
@@ -50,6 +59,9 @@ BOOL M36_Close(DWORD context)
 }
 static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
+#ifdef COM_V4
+    return serial_io(port,buffer,count,input);
+#else
     BYTE stage[512];DWORD bytes=0,n;USB_TRANSFER t;BOOL ok;
     if(!count)return 0;
     EnterCriticalSection(&port->io);
@@ -67,25 +79,47 @@ static DWORD stream_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     LeaveCriticalSection(&port->io);
     if(!ok){SetLastError(ERROR_IO_DEVICE);return (DWORD)-1;}
     return bytes;
+#endif
 }
 DWORD M36_Read(DWORD context,LPVOID buffer,DWORD count){return stream_io((PORT*)context,buffer,count,TRUE);}
 DWORD M36_Write(DWORD context,LPCVOID buffer,DWORD count){return stream_io((PORT*)context,(LPVOID)buffer,count,FALSE);}
 DWORD M36_Seek(DWORD context,LONG distance,DWORD method){SetLastError(ERROR_NOT_SUPPORTED);return (DWORD)-1;}
 BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+#ifdef COM_V4
+{return serial_control((PORT*)context,code,in,inSize,out,outSize,actual);}
+#else
 {if(actual)*actual=0;SetLastError(ERROR_NOT_SUPPORTED);return FALSE;}
+#endif
 void M36_PowerUp(DWORD context){}
 void M36_PowerDown(DWORD context){}
 static DWORD WINAPI worker(LPVOID param)
 {
     PROBE *p=(PROBE*)param;DWORD i,bytes,index,disp;PORT *port;HKEY key;WCHAR path[96];
     USB_DEVICE_REQUEST request;USB_TRANSFER t;
+#ifdef COM_V4
+#ifdef COM_V5
+    logline(L"V5 WAIT_MODEM_READY 5s\r\n");
+    for(i=0;i<5;i++){SystemIdleTimerReset();if(WaitForSingleObject(p->stop,1000)==WAIT_OBJECT_0)return 0;}
+#else
+    logline(L"V4 WAIT_MODEM_READY 20s\r\n");
+    /* Startup-only idle reset; runtime power policy remains unchanged. */
+    for(i=0;i<20;i++){SystemIdleTimerReset();if(WaitForSingleObject(p->stop,1000)==WAIT_OBJECT_0)return 0;}
+#endif
+#else
     logline(L"V3 WAIT_MODEM_READY 20s\r\n");
     if(WaitForSingleObject(p->stop,20000)==WAIT_OBJECT_0)return 0;
+#endif
     for(i=0;i<p->count;i++) {
         if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
         port=(PORT*)LocalAlloc(LPTR,sizeof(PORT));if(!port)continue;
         port->parent=p;port->refs=1;port->index=p->iface[i];
         InterlockedIncrement(&p->refs);InitializeCriticalSection(&port->io);p->ports[i]=port;
+#ifdef COM_V4
+        port->lines=3;port->dcb.DCBlength=sizeof(DCB);port->dcb.BaudRate=115200;port->dcb.ByteSize=8;port->dcb.fBinary=TRUE;
+        port->dcb.fDtrControl=DTR_CONTROL_ENABLE;port->dcb.fRtsControl=RTS_CONTROL_ENABLE;
+        port->timeouts.ReadIntervalTimeout=MAXDWORD;port->timeouts.ReadTotalTimeoutMultiplier=MAXDWORD;
+        port->timeouts.ReadTotalTimeoutConstant=3000;port->timeouts.WriteTotalTimeoutConstant=3000;
+#endif
         port->in=p->usb->lpOpenPipe(p->device,&p->in[i]);
         port->out=p->usb->lpOpenPipe(p->device,&p->out[i]);
         if(!port->in || !port->out){logline(L"V3 PIPE_FAILED interface=%lu\r\n",port->index);continue;}
@@ -93,17 +127,46 @@ static DWORD WINAPI worker(LPVOID param)
         request.wValue=3;request.wIndex=(USHORT)port->index;
         t=p->usb->lpIssueVendorTransfer(p->device,NULL,NULL,USB_OUT_TRANSFER|USB_NO_WAIT|USB_SEND_TO_INTERFACE,&request,NULL,0);
         if(!wait_transfer(p,t,1000,&bytes))continue;
+#ifdef COM_V4
+#ifdef COM_V5
+        wsprintfW(path,L"Drivers\\ME3630ComV5\\Port%lu",port->index);
+#else
+        wsprintfW(path,L"Drivers\\ME3630ComV4\\Port%lu",port->index);
+#endif
+#else
         wsprintfW(path,L"Drivers\\ME3630StreamV3\\Port%lu",port->index);
+#endif
         if(RegCreateKeyEx(HKEY_LOCAL_MACHINE,path,0,NULL,0,0,NULL,&key,&disp)!=ERROR_SUCCESS)continue;
         index=port->index;
+#ifdef COM_V4
+        index=port->index==1?1:5;
+#ifdef COM_V5
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV5.dll",sizeof(L"ME3630ComV5.dll"));
+#else
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV4.dll",sizeof(L"ME3630ComV4.dll"));
+#endif
+        RegSetValueEx(key,L"Prefix",0,REG_SZ,(LPBYTE)L"COM",sizeof(L"COM"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630StreamV3.dll",sizeof(L"ME3630StreamV3.dll"));
         RegSetValueEx(key,L"Prefix",0,REG_SZ,(LPBYTE)L"M36",sizeof(L"M36"));
+#endif
         RegSetValueEx(key,L"Index",0,REG_DWORD,(LPBYTE)&index,sizeof(index));RegCloseKey(key);
         if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
         port->active=ActivateDevice(path,(DWORD)port);
+#ifdef COM_V4
+        logline(L"V4 ACTIVATE COM%lu: interface=%lu handle=%08lx error=%lu\r\n",index,port->index,(DWORD)port->active,GetLastError());
+#else
         logline(L"V3 ACTIVATE M36%lu: handle=%08lx error=%lu\r\n",index,(DWORD)port->active,GetLastError());
+#endif
     }
-    logline(L"V3 READY\r\n");return 0;
+#ifdef COM_V5
+    logline(L"V5 READY\r\n");
+#elif defined(COM_V4)
+    logline(L"V4 READY\r\n");
+#else
+    logline(L"V3 READY\r\n");
+#endif
+    return 0;
 }
 static void stream_cleanup(PROBE *p)
 {

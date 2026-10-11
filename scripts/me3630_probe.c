@@ -34,7 +34,15 @@ static void logline(LPCWSTR format,...)
     n=wvsprintfW(text,format,args);
     va_end(args);
 #ifdef STREAM_V3
+#ifdef COM_V4
+#ifdef COM_V5
+    file=CreateFile(L"\\Temp\\ME3630-com-v5.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
+    file=CreateFile(L"\\Temp\\ME3630-com-v4.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
+#else
     file=CreateFile(L"\\Temp\\ME3630-stream-v3.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
 #else
     file=CreateFile(L"\\Temp\\ME3630-usb-probe.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 #endif
@@ -65,6 +73,18 @@ static BOOL wait_transfer(PROBE *p,USB_TRANSFER t,DWORD timeout,LPDWORD bytes)
 }
 
 #ifdef STREAM_V3
+#ifdef COM_V4
+#define M36_Init COM_Init
+#define M36_Deinit COM_Deinit
+#define M36_Open COM_Open
+#define M36_Close COM_Close
+#define M36_Read COM_Read
+#define M36_Write COM_Write
+#define M36_Seek COM_Seek
+#define M36_IOControl COM_IOControl
+#define M36_PowerUp COM_PowerUp
+#define M36_PowerDown COM_PowerDown
+#endif
 #include "me3630_stream.inc"
 #else
 static DWORD WINAPI worker(LPVOID param)

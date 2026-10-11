@@ -6,6 +6,8 @@
 
 ## 当前结论
 
+- 当前实机已安装自编 V5：COM1:（MI1/AT）、COM5:（MI2/MODEM），支持基础115200/8N1配置、DCB/超时回读、DTR/RTS请求与有界读写。AT/ATI 4/4、控制检查32/32通过；1字节读取后剩余响应完整保留。反复重枚举尚未解决，事件/调制解调器状态/双向并发/PPP尚未实现，不能当作稳定拨号驱动。源码范围和操作见 scripts/COM_V4.md，证据 evidence/2026-10-11-com-v5/test.txt。
+
 - V3 已在实机提供 M361:（AT）、M362:（MODEM）诊断流接口。独立应用通过 CreateFile/WriteFile/ReadFile 对两个接口执行 AT/ATI，4/4 成功，型号/固件正确，各传输 USB 错误0。不是标准 COM 驱动：尚缺串口控制、事件和电源管理。测试过程中发现反复重枚举；短时重置空闲计时器后成功，原因仍需确认。详见 scripts/STREAM_V3.md 和 evidence/2026-10-11-stream-v3/test.txt。
 
 - 自编 CE5.2 USB V2 原型已在 WM6 成功完成 MI1（AT）、MI2（MODEM）的 AT 收发：两个通道都写入3字节、读入6字节并响应 OK，USB错误0。还未实现 COM 接口和 PPP，长期稳定性未验证。源码和日志位于 scripts/me3630_probe.c、evidence/2026-10-11-usb-probe/usb-probe.txt。

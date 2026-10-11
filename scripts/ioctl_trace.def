@@ -1,0 +1,11 @@
+EXPORTS
+ TRC_Init
+ TRC_Deinit
+ TRC_Open
+ TRC_Close
+ TRC_Read
+ TRC_Write
+ TRC_Seek
+ TRC_IOControl
+ TRC_PowerUp
+ TRC_PowerDown

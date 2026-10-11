@@ -1,5 +1,33 @@
 # 探索记录
 
+## 2026-10-11：V5 COM 全部基础检查通过并保存里程碑
+
+最新复测摘要：COMMANDS_PASSED=4/4 CONTROL_CHECKS=32 FAILURES=0 COMPLETE。COM1/COM5均成功打开；Get/SetCommState、DCB回读、Get/SetCommTimeouts、超时回读、DTR/RTS请求、非法配置拒绝、独占打开全部符合已定义子集。两次350ms空读实测均352ms，成功返回0字节。每条AT响应先读1字节、后读5字节；ATI先读1字节、后读111字节，两个通道均得到完整OK、ME3630及ME3630C1AV2.0B01，验证了小应用缓冲区不会截断USB缓存中的剩余响应。
+
+证据：evidence/2026-10-11-com-v5/test.txt及driver.txt，失败/较早尝试另存first-attempt文件；IMEI已脱敏，原始日志被.gitignore排除。实际加载且未被后续测试构建覆盖的V5 DLL SHA256=84a017f5b9264c23d5563fdfecf9c57eea4a74907271697e3e7606d25cdf082c。V3保留，V4保留用于对照。
+
+运行状态限制：测试结束后日志仍有DETACH/ATTACH。缩短5秒启动等待让串口功能能在枚举窗口内被验证，并未解决模块/USB链路重启问题。系统on样本不能排除模块供电、线缆、固件或主控问题；HCD1电源查询error2不给出主控状态。后续优先进行拔出带打开句柄、连续读写/事件队列、设备电源与模块重启原因诊断，再考虑Unimodem/PPP，不进行真实SIM数据拨号。
+
+## 2026-10-11：V5 缩短启动等待，COM 命令与控制接口首次验证
+
+V4第二轮40秒等待仍未赶上可用窗口。电源采样期间系统始终on，flags0x12010000；HCD1的GetDevicePower返回error2，不能据此判断USB主控D0/Dx。保留V4日志及失败证据，不再将SystemIdleTimerReset视为重枚举问题的解决方案。
+
+新增COM_V5独立编译版本，仅把启动等待从20秒改为5秒，使用新的ME3630ComV5.dll和注册表子键，串口功能保持V4子集；安装成功error0，已自动在后续重枚举加载，不要求再次拔插。保留V3/V4文件及注册回退路径。部分继承日志仍显示V4 ACTIVATE，V5 WAIT/V5 READY及DLL名称确定实际版本。
+
+V5第一轮实机：COM1/COM5打开成功；DCB回读、115200/8N1设置、非法波特率拒绝、DTR/RTS请求及软件状态、超时设置回读、非法无界超时拒绝均成功；空读分别354ms/352ms返回成功+0字节。AT/ATI两个接口4/4通过，型号与固件正确。32项控制检查中30项按原断言通过；另外两项第二次打开均被拒绝，但返回55而非预期32，原打开句柄随后AT/ATI正常，说明并非当时设备已移除。证据test-first-attempt.txt和driver-first-attempt.txt，不删除原失败记录。
+
+测试修正为接受WM6的第二次打开error55/32，并继续以原句柄AT/ATI成功确认独占语义。新增V5响应首轮ReadFile只请求1字节、后续读取剩余数据，验证512字节缓存保留。此修正不重编或覆盖实机加载DLL，只更换测试EXE。最新复测结果另记。V5仍有持续重枚举；这不是长时稳定驱动或可用PPP实现。
+
+## 2026-10-11：实测串口 IOCTL ABI，安装 V4 COM 原型
+
+WM6 SDK缺少Pegdser.h，不使用桌面NT串口编码猜测。新增临时 TRC1 流驱动和测试程序，在实机用原生 Get/SetCommState、Get/SetCommTimeouts、EscapeCommFunction等18项API，记录其发给流驱动的IOCTL和缓冲区长度。追踪驱动不操作USB/现有COM，返回ERROR_NOT_SUPPORTED是预期行为，结束后DeregisterDevice。完整证据：evidence/2026-10-11-com-v4/ioctl-abi.txt。测得DCB=28字节，COMMTIMEOUTS=20字节；关键编码及支持范围见scripts/COM_V4.md。
+
+基于V3新增COM_V4条件编译，以独立ME3630ComV4.dll保留旧二进制。最新活动注册表快照中COM1/COM5未占用，映射MI1->COM1、MI2->COM5；不更改LeadCore的COM0/2/3/4/6/8/9或WMDC驱动。实现Get/SetDCB、两种有界超时、DTR/RTS USB请求；读超时返回成功+实际字节（可为0）；512字节接收缓存保存小缓冲区读剩余字节。读写控制仍串行化，无完整事件/调制解调器状态/PPP。未支持设置明确返回ERROR_NOT_SUPPORTED。启动20秒内临时重置空闲计时器，不改持久电源策略。
+
+V4编译成功，实机安装器LoadLibrary/注册成功error0；日志已见COM1和COM5激活成功。DLL SHA256=bc2f57370190877d183e79dc860c1b61bf1311c96089b07dd4fe256e15497e18。V3条件编译也已通过语法检查。第一轮应用测试固定等待25秒后打开：两个COM已被移除，error55，0/4、控制检查0项。记录test-first-attempt.txt和driver-first-attempt.txt，不能将其认定为串口控制实现失败。
+
+V4日志仍出现反复DETACH/ATTACH，即便启动及测试调用SystemIdleTimerReset；因此之前V3的保持唤醒后成功只能作为相关现象，不能判定重枚举由自动休眠导致。已更新应用测试为40秒有界等待端口出现，并采样GetSystemPowerState/GetDevicePower(HCD1:)；不更改电源策略。测试还检查DCB/超时回读、非法配置拒绝、控制线缓存更新、350ms空读超时、独占打开，以及AT/ATI，目标32项控制检查及4项命令全部成功。测试结果另记，不以安装成功代替验证。
+
 ## 2026-10-11：V3 应用层双接口 AT/ATI 验证通过
 
 继续开发自编流接口：me3630_probe.c 的 STREAM_V3 条件编译引用 me3630_stream.inc，新增 M36_Init/Open/Read/Write/Close/Deinit 等导出。MI1 映射 M361:，MI2 映射 M362:；暂不用 COM 前缀，避免碰撞原有 LeadCore 串口，也避免将缺少串口 IOCTL 的诊断接口误认为标准串口。通过 ActivateDevice/ClientInfo 传递上下文，独占打开；512 字节本地 USB staging buffer、3 秒有界传输；拔出先发 stop，等待启动线程退出，再注销子设备并关闭 pipe；引用计数保留仍有打开句柄的上下文。拔出时仍打开句柄的行为待实测。
