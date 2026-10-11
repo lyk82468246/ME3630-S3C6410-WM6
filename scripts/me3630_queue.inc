@@ -53,8 +53,15 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
 static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
 {
  DWORD start,limit,total=0,n,error=0;BOOL first;
+#ifdef COM_V15
+ DWORD abortEpoch;
+#endif
 #ifdef COM_V11
  DWORD waited,waitError;BOOL waitLogged=FALSE;
+#endif
+#ifdef COM_V15
+ /* Snapshot before serializing readers; never hold config while taking RX. */
+ EnterCriticalSection(&p->io);abortEpoch=p->rxAbortEpoch;LeaveCriticalSection(&p->io);
 #endif
  EnterCriticalSection(&p->rxIO);
  EnterCriticalSection(&p->io);limit=p->timeouts.ReadTotalTimeoutConstant;first=p->timeouts.ReadIntervalTimeout==MAXDWORD;LeaveCriticalSection(&p->io);
@@ -71,6 +78,9 @@ static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
  while(total<count){
   EnterCriticalSection(&p->io);
   if(!serial_alive(p)){error=ERROR_DEVICE_NOT_CONNECTED;LeaveCriticalSection(&p->io);break;}
+#ifdef COM_V15
+  if(abortEpoch!=p->rxAbortEpoch){error=ERROR_OPERATION_ABORTED;LeaveCriticalSection(&p->io);break;}
+#endif
   n=ring_pop(p,(BYTE*)buffer+total,count-total);total+=n;
 #ifdef COM_V10
   if(n)logline(L"Q_POP port=%lu tid=%lu ptr=%08lx bytes=%lu queued=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,n,p->qCount);

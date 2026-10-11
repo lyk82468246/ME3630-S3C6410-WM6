@@ -1,5 +1,21 @@
 # 探索记录
 
+## 2026-10-11：V15 第三轮完整通过并发布
+
+最后一次有界复测tick1537677两端口确认INSTANCE_VERSION15，4/4命令、138项、FAILURES0 COMPLETE；清空、非法请求不破坏队列、取消error995与随后AT恢复再次通过，Purge调用16/14ms。首次与第三次为两个完整通过窗口，中间第二次掉线失败原样保留，不称连续通过/长期稳定。双读取者隔离13项仍通过。旧V6/V8/V10/V14及V15源码分支、unit旧/新分支和全部PowerShell语法检查通过；发布focused日志脱敏筛查后按用户授权提交推送。尚未实现TX清空、线路状态/流控/PPP或解决模块重启。
+
+## 2026-10-11：V15 队列状态、接收清空/取消，首轮138项通过
+
+用户继续开发，新增V15独立版本、保留V14。根据此前实机ABI（ClearCommError001b0030输出16、PurgeComm001b0044输入DWORD），实现DWORD错误+COMSTAT12；cbInQue为锁保护的本地环形队列字节数，cbOutQue为当前同步发送尚未完成的字节数，不是模块/硬件队列。TX计数在方向锁内更新，结束前置零，避免与下一写入竞态。无流控hold，不伪造CTS/DSR/DCD；未解析线路错误，fatal RX仅CE_IOE，不通过清错误假装修复USB。
+
+Purge仅支持RXCLEAR/RXABORT或组合，完整验证flags后才变更队列；TX/未知位error50不清空任何字节，零flagserror87。RXCLEAR清本地queue/pendingRXCHAR，不改变mask代数，不取消USB读取，也不保证丢弃模块/在途数据。RXABORT独立读代数，读者在取得rxIO前快照（配置锁先释放），待决读取error995或已有字节部分返回，不取消USB泵/事件等待。随后新读取可继续。不支持overlapped读写或TX清空。主来源与局限见scripts/COM_V15.md。
+
+编译安装dll_load1 installed1 error0；真实DLL SHA256=b3cc7086a4411f3ebf2ed914f72a670a2706a568140ed21b699963f0da90c6b5。新增status_test.inc每端口18项，目标138。首轮tick1342462两端口INSTANCE_VERSION15：4/4命令、CONTROL_CHECKS138 FAILURES0 COMPLETE。队列6->5->0，非法请求保留5字节，清后200ms空读、待决取消和AT恢复均通过；Purge调用15ms，读寿命198/197ms含发送前延迟/日志，不称纯取消延迟，读返回995和0字节。首轮证据单独保存，原始ATI留本地。
+
+第二轮tick1470145：4/4命令、138项、FAILURES20 COMPLETE。COM1通过；COM5在backlog期间RX_EXIT1477405/DETACH1477458，随后status/purge均disconnect。失败原样保存，不改断言、不自动重开句柄掩盖错误。再次启动一次有界复测，结果另记；模块重启仍未解决。未拨号、未改变SIM/RF/APN/供电/WMDC/LeadCore。
+
+新增独立queue_unit_v15（不覆盖旧unit），单进程模拟输入复用生产ring/pump/read。实机tick1514311 CHECKS13 FAILURES0 COMPLETE：现有10项，加待决主读者和等待rxIO第二读者同被代数取消、下一代读者完整接收三项。纯队列测试不操作USB/串口/驱动注册，不能代替跨上下文或USB到达/purge竞态压力测试。证据evidence/2026-10-11-queue-unit-v15/test.txt。
+
 ## 2026-10-11：V14 第三轮完整通过，保存并发接收里程碑
 
 第三轮新tick945045，两端口INSTANCE_VERSION14：4/4命令、102项、FAILURES0 COMPLETE。duplex读332/437ms，写18/114ms；同时事件/读取读182/164ms、事件389/372ms，均完整6字节。第一与第三轮完整通过，第二轮被模块重启打断失败；不称为连续通过/稳定拨号。真实失败证据与所有独立版本源码/二进制一起保存发布，原始ATI/完整注册清单仅本地。V6-V14相关分支语法检查、PowerShell语法及日志标识脱敏检查通过。下一步继续处理模块重启与未实现的线路状态/错误/purge/流控；仍未拨号。

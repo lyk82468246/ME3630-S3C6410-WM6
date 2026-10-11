@@ -2,7 +2,11 @@
 #undef wsprintfW
 typedef BOOL (*INSTALL)(LPCWSTR);
 typedef BOOL (*UNINSTALL)(void);
-#ifdef COM_V14
+#ifdef COM_V15
+#define NEW_DLL L"ME3630ComV15.dll"
+#define OLD_DLL L"ME3630ComV14.dll"
+#define RESULT_PATH L"\\Temp\\ME3630-install-v15.txt"
+#elif defined(COM_V14)
 #define NEW_DLL L"ME3630ComV14.dll"
 #define OLD_DLL L"ME3630ComV13.dll"
 #define RESULT_PATH L"\\Temp\\ME3630-install-v14.txt"

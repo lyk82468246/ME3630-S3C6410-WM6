@@ -65,6 +65,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     }
     start=GetTickCount();limit=input?port->timeouts.ReadTotalTimeoutConstant:port->timeouts.WriteTotalTimeoutConstant;
     first=port->timeouts.ReadIntervalTimeout==MAXDWORD;
+#ifdef COM_V15
+    port->txQueued=count;
+#endif
 #ifdef COM_V7
     /* Per-call configuration snapshot; control remains independent of bulk I/O.
      * The direction lock keeps this pipe/buffer alive until transfer completes. */
@@ -94,6 +97,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #endif
             result=serial_transfer(port,port->out,stage,bytes,FALSE,limit-n,&bytes);
             if(result==1)total+=bytes;
+#ifdef COM_V15
+            EnterCriticalSection(&port->io);port->txQueued=result<0?0:count-total;LeaveCriticalSection(&port->io);
+#endif
         }
         if(result<0){
 #ifdef COM_V7
@@ -105,6 +111,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
         }
         if(result==0)break;
     }
+#ifdef COM_V15
+    EnterCriticalSection(&port->io);port->txQueued=0;LeaveCriticalSection(&port->io);
+#endif
 #ifdef COM_V7
     LeaveCriticalSection(direction);
 #else
@@ -135,7 +144,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_V12
 #ifdef COM_V13
 #ifdef COM_V14
+#ifdef COM_V15
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=15;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=14;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
 #else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=13;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif
@@ -164,6 +177,25 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_V9
         SetEvent(port->eventWake);
 #endif
+        ok=TRUE;break;
+#endif
+#ifdef COM_V15
+    case 0x001b0030: /* Measured ABI: DWORD errors + 12-byte COMSTAT. */
+        if(out && outSize>=sizeof(DWORD)+sizeof(COMSTAT)) {
+            COMSTAT stat;DWORD errors=port->rxFailure?CE_IOE:0;
+            memset(&stat,0,sizeof(stat));stat.cbInQue=port->qCount;stat.cbOutQue=port->txQueued;
+            memcpy(out,&errors,sizeof(errors));memcpy(out+sizeof(errors),&stat,sizeof(stat));
+            if(actual)*actual=sizeof(errors)+sizeof(stat);ok=TRUE;
+        }break;
+    case 0x001b0044: /* Only RX actions; validate entire mask before mutation. */
+        if(!in || inSize!=sizeof(DWORD))break;
+        memcpy(&lines,in,sizeof(lines));if(!lines)break;
+        if(lines&~(PURGE_RXCLEAR|PURGE_RXABORT)){error=ERROR_NOT_SUPPORTED;break;}
+        if(lines&PURGE_RXCLEAR) {
+            port->qHead=port->qCount=0;port->eventPending&=~EV_RXCHAR;
+            ResetEvent(port->rxReady);if(!(port->eventPending&port->eventMask))ResetEvent(port->eventWake);
+        }
+        if(lines&PURGE_RXABORT){port->rxAbortEpoch++;SetEvent(port->rxReady);}
         ok=TRUE;break;
 #endif
     case 0x001b0050: /* GetCommState */

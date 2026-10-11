@@ -54,6 +54,9 @@ static void control_test(HANDLE log,HANDLE port,LPCWSTR name)
 #ifdef COM_V9
 #include "queue_test.inc"
 #endif
+#ifdef COM_V15
+#include "status_test.inc"
+#endif
 void mainCRTStartup(void)
 {
     HANDLE log,port;DWORD i,j,bytes,n,error,total,attempt,passed=0;BOOL ok;WCHAR name[16],line[768];BYTE rx[2048];
@@ -72,7 +75,11 @@ void mainCRTStartup(void)
 #ifdef COM_V12
 #ifdef COM_V13
 #ifdef COM_V14
+#ifdef COM_V15
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v15.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v14.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v13.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif
@@ -152,6 +159,9 @@ void mainCRTStartup(void)
                 expectedVersion=13;
 #ifdef COM_V14
                 expectedVersion=14;
+#ifdef COM_V15
+                expectedVersion=15;
+#endif
 #endif
 #endif
 #endif
@@ -207,6 +217,9 @@ void mainCRTStartup(void)
 #ifdef COM_V9
         queue_test(log,port);
 #endif
+#ifdef COM_V15
+        status_test(log,port);
+#endif
         CloseHandle(port);
     }
     n=wsprintfW(line,L"\r\nCOMMANDS_PASSED=%lu/4 COMPLETE\r\n",passed);
@@ -218,7 +231,11 @@ void mainCRTStartup(void)
 #ifdef COM_V7
 #ifdef COM_V8
 #ifdef COM_V9
+#ifdef COM_V15
+    ExitProcess(passed==4 && failures==0 && checks==138?0:1);
+#else
     ExitProcess(passed==4 && failures==0 && checks==102?0:1);
+#endif
 #else
     ExitProcess(passed==4 && failures==0 && checks==68?0:1);
 #endif

@@ -9,6 +9,9 @@ typedef struct {
  CRITICAL_SECTION io,rxIO; COMMTIMEOUTS timeouts;
  DWORD index,qHead,qCount,rxFailure,eventMask,eventPending;
  BYTE queue[4096];
+#ifdef COM_V15
+ DWORD rxAbortEpoch;
+#endif
 } PORT;
 static BOOL serial_alive(PORT *p){return WaitForSingleObject(p->parent->stop,0)!=WAIT_OBJECT_0;}
 static void port_release(PORT *p){}
@@ -41,7 +44,11 @@ static void check(HANDLE log,LPCWSTR name,BOOL ok)
 void mainCRTStartup(void)
 {
  PORT p;PROBE parent;READJOB job;HANDLE log,pump,thread;DWORD n,begin,bytes;BYTE data[16];WCHAR line[192];
+#ifdef COM_V15
+ log=CreateFile(L"\\Temp\\ME3630-queue-unit-v15.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
  log=CreateFile(L"\\Temp\\ME3630-queue-unit.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
  if(log==INVALID_HANDLE_VALUE)ExitProcess(2);
  n=wsprintfW(line,L"QUEUE_UNIT start_tick=%lu transport=FAKE no_usb=1\r\n",GetTickCount());WriteFile(log,line,n*2,&bytes,NULL);
  memset(&p,0,sizeof(p));memset(&job,0,sizeof(job));parent.stop=CreateEvent(NULL,TRUE,FALSE,NULL);
@@ -62,6 +69,27 @@ void mainCRTStartup(void)
  p.timeouts.ReadIntervalTimeout=0;p.timeouts.ReadTotalTimeoutConstant=200;SetEvent(p.arrival);begin=GetTickCount();
  n=serial_queue_read(&p,data,8);check(log,L"Total deadline returns partial six-byte response",n==6 && memcmp(data,"\r\nOK\r\n",6)==0 && GetTickCount()-begin>=150 && GetTickCount()-begin<1000);
  begin=GetTickCount();n=serial_queue_read(&p,data,1);check(log,L"Empty read returns zero at deadline",n==0 && GetTickCount()-begin>=150 && GetTickCount()-begin<1000);
+#ifdef COM_V15
+ {
+  READJOB second;HANDLE firstThread,secondThread;
+  memset(&second,0,sizeof(second));second.port=&p;second.ready=CreateEvent(NULL,TRUE,FALSE,NULL);
+  p.timeouts.ReadIntervalTimeout=MAXDWORD;p.timeouts.ReadTotalTimeoutConstant=500;
+  ResetEvent(job.ready);firstThread=CreateThread(NULL,0,reader,&job,0,NULL);
+  if(!firstThread || !second.ready)ExitProcess(2);
+  WaitForSingleObject(job.ready,1000);Sleep(50);
+  secondThread=CreateThread(NULL,0,reader,&second,0,NULL);if(!secondThread)ExitProcess(2);
+  WaitForSingleObject(second.ready,1000);Sleep(100);
+  EnterCriticalSection(&p.io);p.rxAbortEpoch++;SetEvent(p.rxReady);LeaveCriticalSection(&p.io);
+  if(WaitForSingleObject(firstThread,2000)!=WAIT_OBJECT_0 || WaitForSingleObject(secondThread,2000)!=WAIT_OBJECT_0)ExitProcess(2);
+  check(log,L"Abort generation releases active reader",job.result==(DWORD)-1 && job.error==ERROR_OPERATION_ABORTED && job.elapsed<1000);
+  check(log,L"Abort generation releases serialized reader",second.result==(DWORD)-1 && second.error==ERROR_OPERATION_ABORTED && second.elapsed<1000);
+  CloseHandle(firstThread);CloseHandle(secondThread);CloseHandle(second.ready);
+  ResetEvent(job.ready);thread=CreateThread(NULL,0,reader,&job,0,NULL);if(!thread)ExitProcess(2);
+  WaitForSingleObject(job.ready,1000);Sleep(50);SetEvent(p.arrival);
+  if(WaitForSingleObject(thread,2000)!=WAIT_OBJECT_0)ExitProcess(2);
+  check(log,L"New generation reader receives complete reply",job.result==6 && job.error==0 && memcmp(job.data,"\r\nOK\r\n",6)==0);CloseHandle(thread);
+ }
+#endif
  ResetEvent(job.ready);memset(job.data,0,sizeof(job.data));thread=CreateThread(NULL,0,reader,&job,0,NULL);if(!thread)ExitProcess(2);
  WaitForSingleObject(job.ready,1000);Sleep(50);SetEvent(parent.stop);
  if(WaitForSingleObject(thread,2000)!=WAIT_OBJECT_0)ExitProcess(2);

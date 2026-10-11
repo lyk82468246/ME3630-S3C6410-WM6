@@ -14,6 +14,9 @@ typedef struct {
 #ifdef COM_V9
     HANDLE rxThread,rxReady,eventWake;
     DWORD qHead,qCount,rxFailure;
+#ifdef COM_V15
+    DWORD rxAbortEpoch,txQueued;
+#endif
     BYTE queue[4096];
 #ifdef COM_V12
     LONG pumpPhase,pumpCycles,pumpTimeouts;
@@ -186,7 +189,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V12
 #ifdef COM_V13
 #ifdef COM_V14
+#ifdef COM_V15
+        wsprintfW(path,L"Drivers\\ME3630ComV15\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV14\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV13\\Port%lu",port->index);
 #endif
@@ -234,7 +241,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V12
 #ifdef COM_V13
 #ifdef COM_V14
+#ifdef COM_V15
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV15.dll",sizeof(L"ME3630ComV15.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV14.dll",sizeof(L"ME3630ComV14.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV13.dll",sizeof(L"ME3630ComV13.dll"));
 #endif
@@ -288,7 +299,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V12
 #ifdef COM_V13
 #ifdef COM_V14
+#ifdef COM_V15
+    logline(L"V15 READY duplex=1 queue=4096 status=1 purge=RX\r\n");
+#else
     logline(L"V14 READY duplex=1 queue=4096 pump_deadline=5000\r\n");
+#endif
 #else
     logline(L"V13 READY duplex=1 queue=4096 tx_stage=driver_owned\r\n");
 #endif
