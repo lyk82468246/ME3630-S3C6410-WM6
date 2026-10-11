@@ -16,6 +16,10 @@ typedef struct {
     LPCUSB_FUNCS usb;
     HANDLE stop, thread;
     USB_ENDPOINT_DESCRIPTOR in[2], out[2];
+#ifdef COM_V16
+    USB_ENDPOINT_DESCRIPTOR notify[2];
+    BOOL notifyFound[2];
+#endif
     DWORD iface[2], count;
 #ifdef COM_V6
     USB_ENDPOINT_DESCRIPTOR adbIn,adbOut;
@@ -50,7 +54,11 @@ static void logline(LPCWSTR format,...)
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+    file=CreateFile(L"\\Temp\\ME3630-com-v16.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#else
     file=CreateFile(L"\\Temp\\ME3630-com-v15.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+#endif
 #else
     file=CreateFile(L"\\Temp\\ME3630-com-v14.txt",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 #endif
@@ -206,6 +214,9 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
     LPCUSB_CONFIGURATION config;
     LPCUSB_INTERFACE iface;
     LPCUSB_ENDPOINT_DESCRIPTOR ep,in,out;
+#ifdef COM_V16
+    LPCUSB_ENDPOINT_DESCRIPTOR notify;
+#endif
     PROBE *p;
     DWORD i,j;
     *accept=FALSE;
@@ -226,14 +237,23 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
     logline(L"CONFIG interfaces=%lu\r\n",config->dwNumInterfaces);
     for(i=0;i<config->dwNumInterfaces;i++) {
         iface=&config->lpInterfaces[i];in=NULL;out=NULL;
+#ifdef COM_V16
+        notify=NULL;
+#endif
         logline(L"IF number=%lu alt=%lu class=%02x subclass=%02x protocol=%02x endpoints=%lu\r\n",iface->Descriptor.bInterfaceNumber,iface->Descriptor.bAlternateSetting,iface->Descriptor.bInterfaceClass,iface->Descriptor.bInterfaceSubClass,iface->Descriptor.bInterfaceProtocol,iface->Descriptor.bNumEndpoints);
         for(j=0;j<iface->Descriptor.bNumEndpoints;j++) {
             ep=&iface->lpEndpoints[j].Descriptor;
             logline(L"EP address=%02x attributes=%02x packet=%lu\r\n",ep->bEndpointAddress,ep->bmAttributes,ep->wMaxPacketSize);
             if((ep->bmAttributes & 3)==2) {if(ep->bEndpointAddress & 0x80)in=ep;else out=ep;}
+#ifdef COM_V16
+            if((ep->bmAttributes & 3)==3 && (ep->bEndpointAddress & 0x80) && ep->wMaxPacketSize && ep->wMaxPacketSize<=64)notify=ep;
+#endif
         }
         if(iface->Descriptor.bAlternateSetting==0 && (iface->Descriptor.bInterfaceNumber==1 || iface->Descriptor.bInterfaceNumber==2) && in && out && p->count<2) {
             p->iface[p->count]=iface->Descriptor.bInterfaceNumber;
+#ifdef COM_V16
+            if(notify){p->notify[p->count]=*notify;p->notifyFound[p->count]=TRUE;}
+#endif
             p->in[p->count]=*in;p->out[p->count]=*out;p->count++;
         }
 #ifdef COM_V6

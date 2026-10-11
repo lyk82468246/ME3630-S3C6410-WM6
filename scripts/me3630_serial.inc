@@ -145,7 +145,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=16;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=15;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
 #else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=14;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif

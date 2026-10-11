@@ -76,7 +76,11 @@ void mainCRTStartup(void)
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v16.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v15.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v14.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif
@@ -161,6 +165,9 @@ void mainCRTStartup(void)
                 expectedVersion=14;
 #ifdef COM_V15
                 expectedVersion=15;
+#ifdef COM_V16
+                expectedVersion=16;
+#endif
 #endif
 #endif
 #endif

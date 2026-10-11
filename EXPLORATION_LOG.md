@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：V16 中断端点只读采集，首轮138项通过
+
+第二轮独立新进程实机复测也完成：两句柄INSTANCE_VERSION16、AT/ATI4/4、138项零失败，保留首轮driver-first/test-first及第二轮driver/test。两个完整短窗口并不证明持续稳定，模块重启仍在发生。按用户授权发布本轮源码、自编诊断二进制和脱敏聚焦证据，不发布完整初始快照/raw ATI。
+
+按用户“继续工作”通过Joe实际32位PowerShell/RAPI检查：初始没有ME3630活动串口，OHCI和V15匹配项存在。保持接线等待，未重启Host或WM6。实现V16独立版本，保留V15：描述符只选择MI1/MI2中断IN端点，每口独立64字节驱动缓冲和线程，30秒空闲期限、停止事件及detach join；失效线程保留引用/管道，避免释放待决USB缓冲。仅日志捕获，不解析为串口状态、不新增拨号/射频/APN/SIM/IMEI操作。来源核对Linux option.c的A1/20通知及CTS假设，不复制其代码或伪造CTS。
+
+build_com.ps1 -Version16编译成功，deploy_com.ps1 -Version16安装dll_load1 installed1 error0，随后自动枚举。-Version16 -Test的新进程tick2076812两句柄核验实例16，AT/ATI4/4、138项零失败。首个枚举MI1/MI2各11个10字节通知，分别a1 20 00 00 01/02 00 02 00 00 00；头部与两字节载荷布局符合预期，当前载荷全零，未验证真实线路变化，不实现GetCommModemStatus/DSR/DCD事件。
+
+tick2110619掉线，两个NOTIFY_EXIT/NOTIFY_JOIN wait0、两个RX_JOIN wait0；随后boot_id变化且uptime11.31，模块重启仍未解决。源码日志共享写入未串行化，已有少量行交错，不能以缺失日志证明没收到报文。生产队列模拟传输回归tick2101754为13/13，非USB中断测试；V6/V8/V10/V14/V15/V16三种C源分支语法与全部PowerShell语法通过。记录/证据：scripts/COM_V16.md、evidence/2026-10-11-com-v16（raw ATI和完整快照不发布）。后续严格报文解析与已知状态掩码/日志串行化/真实拨号分别验证，不能把捕获通知当成PPP完成。正在进行第二轮有界实机复测。
+
 ## 2026-10-11：V15 第三轮完整通过并发布
 
 最后一次有界复测tick1537677两端口确认INSTANCE_VERSION15，4/4命令、138项、FAILURES0 COMPLETE；清空、非法请求不破坏队列、取消error995与随后AT恢复再次通过，Purge调用16/14ms。首次与第三次为两个完整通过窗口，中间第二次掉线失败原样保留，不称连续通过/长期稳定。双读取者隔离13项仍通过。旧V6/V8/V10/V14及V15源码分支、unit旧/新分支和全部PowerShell语法检查通过；发布focused日志脱敏筛查后按用户授权提交推送。尚未实现TX清空、线路状态/流控/PPP或解决模块重启。

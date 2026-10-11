@@ -5,6 +5,11 @@
 typedef struct {
     PROBE *parent;
     USB_PIPE in,out;
+#ifdef COM_V16
+    USB_PIPE notify;
+    HANDLE notifyThread;
+    DWORD notifySize;
+#endif
     HANDLE active;
     CRITICAL_SECTION io;
 #ifdef COM_V7
@@ -48,6 +53,9 @@ static void port_release(PORT *port)
 {
     if(InterlockedDecrement(&port->refs)==0) {
         PROBE *p=port->parent;
+#ifdef COM_V16
+        if(port->notifyThread)CloseHandle(port->notifyThread);
+#endif
 #ifdef COM_V9
         if(port->rxThread)CloseHandle(port->rxThread);
         if(port->rxReady)CloseHandle(port->rxReady);
@@ -61,6 +69,9 @@ static void port_release(PORT *port)
 }
 #ifdef COM_V4
 #include "me3630_serial.inc"
+#endif
+#ifdef COM_V16
+#include "me3630_notify.inc"
 #endif
 DWORD M36_Init(DWORD context)
 {
@@ -178,6 +189,17 @@ static DWORD WINAPI worker(LPVOID param)
         port->rxThread=CreateThread(NULL,0,serial_rx_pump,port,0,NULL);
         if(!port->rxThread){port_release(port);logline(L"V9 RX_THREAD_FAILED\r\n");continue;}
 #endif
+#ifdef COM_V16
+        if(p->notifyFound[i] && p->usb->lpIssueInterruptTransfer) {
+            port->notify=p->usb->lpOpenPipe(p->device,&p->notify[i]);
+            port->notifySize=p->notify[i].wMaxPacketSize;
+            if(port->notify) {
+                InterlockedIncrement(&port->refs);
+                port->notifyThread=CreateThread(NULL,0,serial_notify_probe,port,0,NULL);
+                if(!port->notifyThread){port_release(port);logline(L"V16 NOTIFY_THREAD_FAILED interface=%lu\r\n",port->index);}
+            } else logline(L"V16 NOTIFY_PIPE_FAILED interface=%lu error=%lu\r\n",port->index,GetLastError());
+        }
+#endif
 #ifdef COM_V4
 #ifdef COM_V5
 #ifdef COM_V6
@@ -190,7 +212,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+        wsprintfW(path,L"Drivers\\ME3630ComV16\\Port%lu",port->index);
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV15\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV14\\Port%lu",port->index);
 #endif
@@ -242,7 +268,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV16.dll",sizeof(L"ME3630ComV16.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV15.dll",sizeof(L"ME3630ComV15.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV14.dll",sizeof(L"ME3630ComV14.dll"));
 #endif
@@ -300,7 +330,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V13
 #ifdef COM_V14
 #ifdef COM_V15
+#ifdef COM_V16
+    logline(L"V16 READY duplex=1 queue=4096 interrupt_probe=1 modem_status=unsupported\r\n");
+#else
     logline(L"V15 READY duplex=1 queue=4096 status=1 purge=RX\r\n");
+#endif
 #else
     logline(L"V14 READY duplex=1 queue=4096 pump_deadline=5000\r\n");
 #endif
@@ -343,6 +377,13 @@ static void stream_cleanup(PROBE *p)
     DWORD i;PORT *port;
     for(i=0;i<p->count;i++) {
         port=(PORT*)p->ports[i];if(!port)continue;
+#ifdef COM_V16
+        if(port->notifyThread) {
+            DWORD joined=WaitForSingleObject(port->notifyThread,5000);
+            logline(L"V16 NOTIFY_JOIN interface=%lu wait=%lu\r\n",port->index,joined);
+            if(joined!=WAIT_OBJECT_0){logline(L"V16 RETAIN_STUCK_NOTIFY interface=%lu\r\n",port->index);continue;}
+        }
+#endif
 #ifdef COM_V9
         if(port->rxThread) {
             DWORD joined=WaitForSingleObject(port->rxThread,5000);
@@ -361,6 +402,10 @@ static void stream_cleanup(PROBE *p)
         EnterCriticalSection(&port->io);
         if(port->in)p->usb->lpClosePipe(port->in);
         if(port->out)p->usb->lpClosePipe(port->out);
+#ifdef COM_V16
+        if(port->notify)p->usb->lpClosePipe(port->notify);
+        port->notify=NULL;
+#endif
         port->in=port->out=NULL;LeaveCriticalSection(&port->io);
 #ifdef COM_V7
         LeaveCriticalSection(&port->txIO);LeaveCriticalSection(&port->rxIO);
