@@ -1,5 +1,9 @@
 # 探索记录
 
+## 2026-10-11：用户再次拔插后有界复测，仍无新USB枚举
+
+用户回复“好了”后直接在Joe32位RAPI执行run_rassaved -Dial。新开始630128，唯一正确ME3630电信条目仍在，号码/COM5/PPP/IP不变。等待重开30秒后660368完成elapsed30240，PORT_UNAVAILABLE error55；仍未调用RasDial。只读Active_ME3630_PORT_BLOCKS=0，HCD1及19d2:1432匹配到ME3630ComV18.dll均在，累计驱动日志最后169078 DETACH、双RX/notify join0，无本次ATTACH。聚焦新失败保存为ras-saved/dial-after-replug.txt；完整注册表仅本地。没有擅自再软重启或改LeadCore/WMDC。下一步需用户授权再次软重启；恢复后应尽快触发已准备的保存连接测试，避免上一轮先行多项诊断占用接入窗口。
+
 ## 2026-10-11：核验用户向导保存的ME3630连接，串口缺失阻止本次拨号
 
 用户反馈WM6已提示新调制解调器，向导可见COM1 Hayes与COM5 Test，并按指导保存“ME3630 电信”，尚未连接。不能把先前RasEnumDevices未找到精确名字直接推断为整个TAPI未识别。新增ras_saved.c/run_rassaved.ps1，通过RasEnumEntries和RasGetEntryProperties只检查ME3630名称条目，不读密码，不改变/删除条目。实际tick483355读到该连接：type modem、device ME3630 Test COM5、phone *99***2#、framing1(PPP)、protocols4(IP)、options00400208；系统保存的devconfig长度684，区别于原注册25字节，不假定同一种格式。枚举返回count10、bytes480，不据此声称10个真实连接。
