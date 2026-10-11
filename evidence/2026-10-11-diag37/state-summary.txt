@@ -1,0 +1,37 @@
+D37 actual lifecycle investigation, 2026-10-11 (Joe32-bit WMDC/RAPI)
+
+Native isolated checks: ownership15/15, compatibility33/33, recorder15/15;
+recorder repeated15/15. No USB cancellation/concurrent teardown coverage.
+Installed1284123 result0 next_attach_only1; DLL SHA256:
+93C12ED850AEF4F9DA76AA19F16ED4136BCA4F58E7015ADA6654621B82CE7485
+
+Before reset: user-confirmed replug; observer1385829..1475988 next0/dropped0.
+Read-only own Active0, exact19d2:1432 matchD37, HCD1 exists.
+One explicitly user-approved soft reset launched PID3431585634.
+First WMDC reconnect timed out30s, second succeeded. No second reset.
+No dial, AT command, host reset, LeadCore/WMDC configuration change.
+
+Baseline46668..136751 next211/dropped0; no SKIP/overwrite.
+Attach70612, COM1 activation75643, COM5 activation75674, READY2.
+RX exit112370 error1117 precedes USB_CLOSE_DEVICE112401.
+Detach entry112401 -> return intent112455 =54ms.
+Worker and both notify/RX joins0; unregisterTRUE; both deactivationsTRUE.
+Six ClosePipeFALSE/error6; locks/releases/end intent present.
+Reattach120113 -> READY2 at125157 (both activations successful).
+
+Follow-up158618..248822 next579/dropped0; no SKIP.
+Initial5 historical records overwritten, preserved in baseline file.
+Detach160945 -> return intent161004 =59ms; reattach168628 -> READY2 at173676.
+Detach209873 -> return intent209876 =3ms; reattach217557 -> READY2 at222605.
+Three distinct cycles total (replayed historical events NOT double-counted).
+Six DeactivateDeviceTRUE,18 ClosePipeFALSE/error6, no observed join timeout.
+User confirms no replug or power changes after reset.
+
+Verified: D37 actually loaded and multiple automatic re-enumerations occurred.
+Not verified: root cause of module disconnects, cause of old non-enumeration,
+pipe failure ownership, continuous stability, private37 serial I/O, PPP/internet.
+LastError0 with transfer API FALSE is NOT success. USB completion status/bytes
+are not recorded by current D37. Return intent is not literal host continuation,
+but subsequent ATTACH is independent evidence of enumeration in these samples.
+Read-only Active0 snapshots caught different lifecycle times, not continuous
+port availability. Ring/drop limitations and next investigation: scripts/DIAG37.md.

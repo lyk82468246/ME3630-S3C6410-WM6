@@ -51,6 +51,9 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
  if(!error)error=ERROR_DEVICE_NOT_CONNECTED;
  EnterCriticalSection(&p->io);p->rxFailure=error;SetEvent(p->rxReady);SetEvent(p->eventWake);LeaveCriticalSection(&p->io);
  logline(L"V9 RX_EXIT interface=%lu error=%lu\r\n",p->index,error);
+#ifdef COM_DIAG37
+ LIFE(M37_RX_EXIT,p,p->index,error);
+#endif
  port_release(p);return 0;
 }
 static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)

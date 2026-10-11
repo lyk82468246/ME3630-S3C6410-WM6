@@ -194,6 +194,9 @@ void M36_PowerDown(DWORD context){}
 static DWORD WINAPI worker(LPVOID param)
 {
     PROBE *p=(PROBE*)param;DWORD i,bytes,index,disp;PORT *port;HKEY key;WCHAR path[96];
+#ifdef COM_DIAG37
+    DWORD activeCount=0;
+#endif
     USB_DEVICE_REQUEST request;USB_TRANSFER t;
 #ifdef COM_V4
 #ifdef COM_V5
@@ -336,7 +339,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG34R2
 #ifdef COM_DIAG35
 #ifdef COM_DIAG36
+#ifdef COM_DIAG37
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D37.dll",sizeof(L"ME3630ComV18D37.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D36.dll",sizeof(L"ME3630ComV18D36.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D35.dll",sizeof(L"ME3630ComV18D35.dll"));
 #endif
@@ -401,7 +408,12 @@ static DWORD WINAPI worker(LPVOID param)
 #endif
         RegSetValueEx(key,L"Index",0,REG_DWORD,(LPBYTE)&index,sizeof(index));RegCloseKey(key);
         if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
+        LIFE(M37_ACTIVATE_BEGIN,port,index,0);
         port->active=ActivateDevice(path,(DWORD)port);
+        LIFE(M37_ACTIVATE_END,port,port->active,port->active && port->active!=INVALID_HANDLE_VALUE?0:GetLastError());
+#ifdef COM_DIAG37
+        if(port->active && port->active!=INVALID_HANDLE_VALUE)activeCount++;
+#endif
 #ifdef COM_V4
         logline(L"V4 ACTIVATE COM%lu: interface=%lu handle=%08lx error=%lu\r\n",index,port->index,(DWORD)port->active,GetLastError());
 #else
@@ -458,7 +470,11 @@ static DWORD WINAPI worker(LPVOID param)
 #else
     logline(L"V6 READY\r\n");
 #endif
+#ifdef COM_DIAG37
+    LIFE(M37_READY,p,activeCount,0);
+#else
     adb_boot_probe(p);
+#endif
 #elif defined(COM_V5)
     logline(L"V5 READY\r\n");
 #elif defined(COM_V4)
@@ -475,37 +491,48 @@ static void stream_cleanup(PROBE *p)
         port=(PORT*)p->ports[i];if(!port)continue;
 #ifdef COM_V16
         if(port->notifyThread) {
-            DWORD joined=WaitForSingleObject(port->notifyThread,5000);
+            DWORD joined;
+            LIFE(M37_NOTIFY_JOIN_BEGIN,port,5000,0);
+            joined=WaitForSingleObject(port->notifyThread,5000);
+            LIFE(M37_NOTIFY_JOIN_END,port,joined,0);
             logline(L"V16 NOTIFY_JOIN interface=%lu wait=%lu\r\n",port->index,joined);
             if(joined!=WAIT_OBJECT_0){logline(L"V16 RETAIN_STUCK_NOTIFY interface=%lu\r\n",port->index);continue;}
         }
 #endif
 #ifdef COM_V9
         if(port->rxThread) {
-            DWORD joined=WaitForSingleObject(port->rxThread,5000);
+            DWORD joined;
+            LIFE(M37_RX_JOIN_BEGIN,port,5000,0);
+            joined=WaitForSingleObject(port->rxThread,5000);
+            LIFE(M37_RX_JOIN_END,port,joined,0);
             logline(L"V9 RX_JOIN interface=%lu wait=%lu\r\n",port->index,joined);
             /* Retain base references/pipes if the host call did not unwind.
              * Never kill a worker or free USB buffer/context underneath it. */
             if(joined!=WAIT_OBJECT_0){logline(L"V9 RETAIN_STUCK_PORT interface=%lu\r\n",port->index);continue;}
         }
 #endif
-        if(port->active && port->active!=INVALID_HANDLE_VALUE)DeactivateDevice(port->active);
+        if(port->active && port->active!=INVALID_HANDLE_VALUE){
+            BOOL result;DWORD error;LIFE(M37_DEACTIVATE_BEGIN,port,port->active,0);
+            result=DeactivateDevice(port->active);error=result?0:GetLastError();LIFE(M37_DEACTIVATE_END,port,result,error);
+        }
 #ifdef COM_V7
         /* stop is already signalled: pending USB waits leave before pipe close.
          * Lock order rx -> tx -> config; neither I/O path takes the other lock. */
-        EnterCriticalSection(&port->rxIO);EnterCriticalSection(&port->txIO);
+        LIFE(M37_LOCK_RX_BEGIN,port,0,0);EnterCriticalSection(&port->rxIO);LIFE(M37_LOCK_RX_END,port,0,0);
+        LIFE(M37_LOCK_TX_BEGIN,port,0,0);EnterCriticalSection(&port->txIO);LIFE(M37_LOCK_TX_END,port,0,0);
 #endif
-        EnterCriticalSection(&port->io);
-        if(port->in)p->usb->lpClosePipe(port->in);
-        if(port->out)p->usb->lpClosePipe(port->out);
+        LIFE(M37_LOCK_IO_BEGIN,port,0,0);EnterCriticalSection(&port->io);LIFE(M37_LOCK_IO_END,port,0,0);
+        if(port->in){BOOL result;DWORD error;LIFE(M37_PIPE_CLOSE_BEGIN,port->in,port->index|0x100,0);result=p->usb->lpClosePipe(port->in);error=result?0:GetLastError();LIFE(M37_PIPE_CLOSE_END,port->in,result,error);}
+        if(port->out){BOOL result;DWORD error;LIFE(M37_PIPE_CLOSE_BEGIN,port->out,port->index|0x200,0);result=p->usb->lpClosePipe(port->out);error=result?0:GetLastError();LIFE(M37_PIPE_CLOSE_END,port->out,result,error);}
 #ifdef COM_V16
-        if(port->notify)p->usb->lpClosePipe(port->notify);
+        if(port->notify){BOOL result;DWORD error;LIFE(M37_PIPE_CLOSE_BEGIN,port->notify,port->index|0x300,0);result=p->usb->lpClosePipe(port->notify);error=result?0:GetLastError();LIFE(M37_PIPE_CLOSE_END,port->notify,result,error);}
         port->notify=NULL;
 #endif
         port->in=port->out=NULL;LeaveCriticalSection(&port->io);
 #ifdef COM_V7
         LeaveCriticalSection(&port->txIO);LeaveCriticalSection(&port->rxIO);
 #endif
-        p->ports[i]=NULL;port_release(port);
+        p->ports[i]=NULL;LIFE(M37_PORT_RELEASE_BEGIN,port,0,0);port_release(port);LIFE(M37_PORT_RELEASE_END,port,0,0);
     }
+    LIFE(M37_CLEANUP_END,p,p->count,0);
 }

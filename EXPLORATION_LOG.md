@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：D37内存生命周期记录器，63项隔离测试通过并安装
+
+用户继续开发后，先补低扰动诊断而非盲改异步取消/释放。D37保留D36接口、private37/版本18；仅此分支关闭同步文件logline和每次自动ADB探针，其他版本不变。固定256槽命名内存记录，不等待槽锁，冲突丢弃计数，读前后校验commit；记录开始/结束/返回码，覆盖GetDeviceInfo之前入口、注册/注销、线程join、DeactivateDevice、方向/配置锁、关管道、释放、同步Abort/Status/CloseTransfer。结束意图不是USB主机已继续执行的证明，cleanup循环结束不是所有资源成功释放；同步取消仍可能阻塞，未称热插拔已修好。独立观察程序持映射跨DLL卸载，日志由该程序写，不在USB回调写；无串口内容/IMEI/密码。详见scripts/DIAG37.md。
+
+Joe32位原生ownership15/15(1278399)、compat33/33(1280649)、life15/15(1281818)全部零失败，life复测15/15(1381349)亦通过；包括真实子进程共享命名内存、并发写、覆盖/未提交拒读、错误码保留和映射寿命，不是USB拔插/取消并发验证。D37/旧D33构建通过，安装1284123 result0 next_attach_only1仅精确匹配，未重启/强卸载/改LeadCore/WMDC/保存连接。DLL哈希93C12ED850AEF4F9DA76AA19F16ED4136BCA4F58E7015ADA6654621B82CE7485。观察程序单独重编译为90秒，未重编译已安装DLL。life_capture1385829启动后用户确认“已重新插拔”，1475988完成next0/dropped0，Active0且精确匹配D37；不能据零记录证明旧回调未进入或电气故障。聚焦证据capture-before-reset。
+
+用户明确批准这一次软重启，run_softreset启动3431585634；首次RAPI重连30秒超时，第二次成功，没有第二次重启、拨号或Host复位。90秒观察46668..136751、211条、dropped0、无SKIP/覆盖：70612真实ATTACH，75643/75674两COM激活成功，READY2。112370双RX退出1117，112401 DETACH；线程join0、注销TRUE、双DeactivateTRUE、三种锁取得及释放均走完，112455返回意图，约54ms。六个ClosePipe均FALSE/error6（无效句柄），不能据此断言双重关闭、泄漏或此前死锁；部分传输API FALSE/error0仍是失败，error是采样LastError，不是USB完成状态。120113再次ATTACH（距返回意图7658ms），125134/125157双COM重新激活READY2，实际证明这轮可继续枚举。不同时间只读Active0快照不能推翻有时间戳的激活/移除记录；未称当前端口一直可用。这轮排除其自身永久卡清理，不能否定旧版历史卡住，也不能把恢复唯一归因于禁日志/禁ADB之一。证据capture-reset-baseline，详见DIAG37。
+
+第二观察158618..248822 next579/dropped0，无SKIP；启动回读历史时旧5条被覆盖（已保存在第一份完整记录），不能把回读的一轮重复计数。新增160945..161004清理59ms、168628再接入173676 READY2；209873..209876清理3ms、217557再接入222605 READY2。合计三轮断开、六次Deactivate成功、18次ClosePipe FALSE/error6，未观察到join超时/RETAIN。用户确认软重启后无任何拔插或供电改动；这次已实测自动重枚举，不再以无证据的整机重启代替观察。仍未解决掉线根因或完成PPP，不能称长期稳定。证据capture-reset-followup和state-summary；后续应补USB完成状态/字节数与低扰动串口调用轨迹，再验证D36事件修复及PPP，不直接盲重试失效句柄。源码、诊断二进制和聚焦证据按授权提交推送，完整清单保留本地。
+
 ## 2026-10-11：用户质疑频繁重启，先只读审计热插拔生命周期
 
 本轮不重启、不安装、不改驱动实现，仅核对源码/现有证据/微软CE5官方接口文档；详见scripts/HOTPLUG_AUDIT.md。确认严重架构缺口：USB_CLOSE_DEVICE回调内同步join/注销COM/关管道，无完整有界退出；lpAbortTransfer(t,0)官方语义为同步等待取消，外层轮询截止不能限制该调用；超时保留引用无退休回收机制、传输worker退出后缺代内恢复、PowerUp/Down为空。日志DETACH wait0在cleanup前，JOIN wait0在该端口DeactivateDevice/ClosePipe前，不能证明完整清理和回调返回；纠正此前“清理正常”的过强表述。

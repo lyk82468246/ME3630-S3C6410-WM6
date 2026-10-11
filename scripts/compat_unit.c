@@ -15,6 +15,7 @@ typedef struct {
 static BOOL serial_alive(PORT *p){return WaitForSingleObject(p->parent->stop,0)!=WAIT_OBJECT_0;}
 static void port_release(PORT *p){}
 static void logline(LPCWSTR format,...){}
+#define LIFE(event,object,value,error) ((void)0)
 static int serial_transfer(PORT *p,HANDLE pipe,LPVOID buf,DWORD size,BOOL input,DWORD timeout,PDWORD bytes){*bytes=0;return 0;}
 #include "me3630_ring.inc"
 #include "me3630_queue.inc"

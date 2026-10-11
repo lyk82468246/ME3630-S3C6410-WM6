@@ -21,9 +21,13 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
             if(WaitForSingleObject(p->stop,20)==WAIT_OBJECT_0 || GetTickCount()-begin>=30000)break;
         }
         complete=p->usb->lpIsTransferComplete(t);
-        if(!complete)p->usb->lpAbortTransfer(t,0);
         bytes=0;error=USB_NOT_COMPLETE_ERROR;
+#ifdef COM_DIAG37
+        life_finish_transfer(p,t,complete,port->index|0x300,&bytes,&error);
+#else
+        if(!complete)p->usb->lpAbortTransfer(t,0);
         p->usb->lpGetTransferStatus(t,&bytes,&error);p->usb->lpCloseTransfer(t);
+#endif
         if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0)break;
         if(!complete){timeouts++;logline(L"V16 NOTIFY_IDLE interface=%lu count=%lu\r\n",port->index,timeouts);continue;}
         if(error!=USB_NO_ERROR || bytes>port->notifySize){logline(L"V16 NOTIFY_USB_ERROR interface=%lu bytes=%lu usb_error=%lu\r\n",port->index,bytes,error);break;}
@@ -52,6 +56,7 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
         if(!bytes && WaitForSingleObject(p->stop,20)==WAIT_OBJECT_0)break;
     }
     logline(L"V16 NOTIFY_EXIT interface=%lu packets=%lu idle=%lu\r\n",port->index,packets,timeouts);
+    LIFE(M37_NOTIFY_EXIT,port,port->index,0);
 #ifdef COM_V17
     EnterCriticalSection(&port->io);port->notifyState.known=0;
     port->notifyState.error=WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0?ERROR_DEVICE_NOT_CONNECTED:ERROR_IO_DEVICE;

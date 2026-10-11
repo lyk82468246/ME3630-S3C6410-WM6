@@ -3,6 +3,13 @@
 #include <windows.h>
 #include <usbdi.h>
 #include <stdarg.h>
+#ifdef COM_DIAG37
+#include "me3630_life.h"
+static M37_MAP *life;static HANDLE lifeHandle;static LONG lifeInit;
+#define LIFE(event,object,value,error) m37_put(life,event,(DWORD)(object),(DWORD)(value),(DWORD)(error))
+#else
+#define LIFE(event,object,value,error) ((void)0)
+#endif
 #ifdef COM_V17
 #include "me3630_notify_state.h"
 static CRITICAL_SECTION traceLock;
@@ -37,6 +44,10 @@ typedef struct {
 
 static void logline(LPCWSTR format,...)
 {
+#ifdef COM_DIAG37
+    /* Lifecycle uses bounded memory records, not synchronous filesystem I/O. */
+    return;
+#else
     WCHAR text[768],stamp[64];
     HANDLE file;
     DWORD bytes;
@@ -121,7 +132,18 @@ static void logline(LPCWSTR format,...)
 #ifdef COM_V17
     LeaveCriticalSection(&traceLock);
 #endif
+#endif
 }
+
+#ifdef COM_DIAG37
+static void life_finish_transfer(PROBE *p,USB_TRANSFER t,BOOL complete,DWORD actor,PDWORD bytes,PDWORD error)
+{
+ BOOL result;DWORD code;
+ if(!complete){LIFE(M37_ABORT_BEGIN,t,actor,0);result=p->usb->lpAbortTransfer(t,0);code=result?0:GetLastError();LIFE(M37_ABORT_END,t,result,code);}
+ result=p->usb->lpGetTransferStatus(t,bytes,error);code=result?0:GetLastError();LIFE(M37_STATUS,t,result,code);
+ LIFE(M37_TRANSFER_CLOSE_BEGIN,t,actor,0);result=p->usb->lpCloseTransfer(t);code=result?0:GetLastError();LIFE(M37_TRANSFER_CLOSE_END,t,result,code);
+}
+#endif
 
 static BOOL wait_transfer(PROBE *p,USB_TRANSFER t,DWORD timeout,LPDWORD bytes)
 {
@@ -132,10 +154,14 @@ static BOOL wait_transfer(PROBE *p,USB_TRANSFER t,DWORD timeout,LPDWORD bytes)
         if(WaitForSingleObject(p->stop,10)==WAIT_OBJECT_0 || GetTickCount()-start>=timeout)break;
     }
     complete=p->usb->lpIsTransferComplete(t);
-    if(!complete)p->usb->lpAbortTransfer(t,0);
     *bytes=0;
+#ifdef COM_DIAG37
+    life_finish_transfer(p,t,complete,0,bytes,&error);
+#else
+    if(!complete)p->usb->lpAbortTransfer(t,0);
     p->usb->lpGetTransferStatus(t,bytes,&error);
     p->usb->lpCloseTransfer(t);
+#endif
     logline(L"transfer complete=%lu bytes=%lu usb_error=%lu\r\n",complete,*bytes,error);
     return complete && error==USB_NO_ERROR;
 }
@@ -206,21 +232,29 @@ static BOOL WINAPI detach(LPVOID ctx,DWORD code,LPDWORD *a,LPDWORD *b,LPDWORD *c
     PROBE *p=(PROBE*)ctx;
     DWORD waited=WAIT_OBJECT_0;
     if(code!=USB_CLOSE_DEVICE)return FALSE;
+    LIFE(M37_DETACH_ENTER,p,0,0);
     SetEvent(p->stop);
-    if(p->thread)waited=WaitForSingleObject(p->thread,10000);
+    if(p->thread){LIFE(M37_WORKER_JOIN_BEGIN,p,10000,0);waited=WaitForSingleObject(p->thread,10000);LIFE(M37_WORKER_JOIN_END,p,waited,0);}
     logline(L"DETACH wait=%lu\r\n",waited);
     /* Retain context if a host call did not return, avoiding a use-after-free. */
     if(waited==WAIT_OBJECT_0) {
-        p->usb->lpUnRegisterNotificationRoutine(p->device,detach,p);
+        LIFE(M37_UNREGISTER_BEGIN,p,0,0);
+        {BOOL result=p->usb->lpUnRegisterNotificationRoutine(p->device,detach,p);DWORD error=result?0:GetLastError();LIFE(M37_UNREGISTER_END,p,result,error);}
 #ifdef STREAM_V3
         stream_cleanup(p);
+        LIFE(M37_PARENT_RELEASE_BEGIN,p,0,0);
         probe_release(p);
+        /* Pointer is an opaque record key only after release, never dereferenced. */
+        LIFE(M37_PARENT_RELEASE_END,p,0,0);
 #else
         if(p->thread)CloseHandle(p->thread);
         CloseHandle(p->stop);
         LocalFree(p);
 #endif
     }
+    else {LIFE(M37_RETAIN,p,waited,0);}
+    /* This is pre-return intent, not proof that the host resumed enumeration. */
+    LIFE(M37_DETACH_RETURN_INTENT,p,waited,0);
     return TRUE;
 }
 
@@ -236,7 +270,12 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
     PROBE *p;
     DWORD i,j;
     *accept=FALSE;
+#ifdef COM_DIAG37
+    if(!life && !InterlockedCompareExchange(&lifeInit,1,0)){DWORD saved=GetLastError();life=m37_open(M37_NAME,&lifeHandle);InterlockedExchange(&lifeInit,life?2:0);SetLastError(saved);}
+#endif
+    LIFE(M37_ATTACH_ENTER,device,usb->dwCount,0);
     info=usb->lpGetDeviceInfo(device);
+    LIFE(M37_DEVICE_INFO,device,info!=NULL,info?0:GetLastError());
     if(!info)return FALSE;
     logline(L"ATTACH vid=%04x pid=%04x interface=%ld funcs_size=%lu\r\n",info->Descriptor.idVendor,info->Descriptor.idProduct,selected?(LONG)selected->Descriptor.bInterfaceNumber:-1,usb->dwCount);
     if(info->Descriptor.idVendor!=0x19d2 || info->Descriptor.idProduct!=0x1432)return FALSE;
@@ -280,7 +319,8 @@ BOOL USBDeviceAttach(USB_HANDLE device,LPCUSB_FUNCS usb,LPCUSB_INTERFACE selecte
         }
 #endif
     }
-    if(!usb->lpRegisterNotificationRoutine(device,detach,p)) {CloseHandle(p->stop);LocalFree(p);return FALSE;}
+    LIFE(M37_REGISTER_BEGIN,p,0,0);
+    {BOOL result=usb->lpRegisterNotificationRoutine(device,detach,p);DWORD error=result?0:GetLastError();LIFE(M37_REGISTER_END,p,result,error);if(!result){CloseHandle(p->stop);LocalFree(p);return FALSE;}}
     p->thread=CreateThread(NULL,0,worker,p,0,NULL);
     if(!p->thread) {
         usb->lpUnRegisterNotificationRoutine(device,detach,p);
@@ -324,6 +364,9 @@ BOOL USBUnInstallDriver(void)
 }
 BOOL WINAPI DllMain(HANDLE module,DWORD reason,LPVOID reserved)
 {
+#ifdef COM_DIAG37
+    if(reason==DLL_PROCESS_DETACH){m37_close(life,lifeHandle);life=NULL;lifeHandle=NULL;}
+#endif
 #ifdef COM_V17
     if(reason==DLL_PROCESS_ATTACH)InitializeCriticalSection(&traceLock);
     if(reason==DLL_PROCESS_DETACH)DeleteCriticalSection(&traceLock);

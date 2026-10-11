@@ -19,7 +19,7 @@ static BOOL serial_lines(PORT *port,DWORD lines)
 /* Returns 1=success, 0=deadline, -1=disconnect/USB failure. */
 static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL input,DWORD timeout,PDWORD bytes)
 {
-    PROBE *p=port->parent;USB_TRANSFER t;DWORD start=GetTickCount(),error;BOOL complete,expired=FALSE;
+    PROBE *p=port->parent;USB_TRANSFER t;DWORD start=GetTickCount(),error=USB_NOT_COMPLETE_ERROR;BOOL complete,expired=FALSE;
     *bytes=0;
 #ifdef COM_DIAG35
     if(!input){
@@ -36,8 +36,12 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
         if(GetTickCount()-start>=timeout){expired=TRUE;break;}
     }
     complete=p->usb->lpIsTransferComplete(t);
+#ifdef COM_DIAG37
+    life_finish_transfer(p,t,complete,port->index|(input?0x100:0x200),bytes,&error);
+#else
     if(!complete)p->usb->lpAbortTransfer(t,0);
     p->usb->lpGetTransferStatus(t,bytes,&error);p->usb->lpCloseTransfer(t);
+#endif
     if(WaitForSingleObject(p->stop,0)==WAIT_OBJECT_0){SetLastError(ERROR_DEVICE_NOT_CONNECTED);return -1;}
     if(complete && error==USB_NO_ERROR && *bytes<=size)return 1;
     *bytes=0;
@@ -194,7 +198,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG36
+#ifdef COM_DIAG37
+            *(DWORD*)out=37;
+#elif defined(COM_DIAG36)
             *(DWORD*)out=36;
 #elif defined(COM_DIAG35)
             *(DWORD*)out=35;
