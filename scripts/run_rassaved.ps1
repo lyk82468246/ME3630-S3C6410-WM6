@@ -27,7 +27,13 @@ try {
  $deadline=[DateTime]::UtcNow.AddSeconds(65);$finished=$false
  do {
   Start-Sleep -Seconds 2
-  if([PositronDeviceRapi]::TryCopyFileFromDevice($deviceLog,"$out\$target")){
+  $copied=$false
+  try {$copied=[PositronDeviceRapi]::TryCopyFileFromDevice($deviceLog,"$out\$target")}
+  catch [System.Management.Automation.MethodInvocationException] {
+   if($_.Exception.InnerException -isnot [System.IO.IOException]){throw}
+   Write-Warning 'Log snapshot temporarily unavailable; retrying within the existing collection deadline.'
+  }
+  if($copied){
    $result=Get-Content "$out\$target" -Encoding Unicode -Raw
    $start=[regex]::Match($result,'SAVED_START tick=(\d+)')
    $finished=$start.Success -and ($null -eq $prior -or $start.Groups[1].Value -ne $prior) -and $result -match 'SAVED_COMPLETE '

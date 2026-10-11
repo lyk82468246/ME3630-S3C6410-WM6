@@ -29,8 +29,18 @@ static BOOL m36_update_notify(M36_NOTIFY_STATE *s,const BYTE *data,DWORD bytes,D
     if(changed&MS_DSR_ON)events|=EV_DSR;
     if(changed&MS_RLSD_ON)events|=EV_RLSD;
     if((changed&MS_RING_ON) && (status&MS_RING_ON))events|=EV_RING;
+#ifdef COM_DIAG35
+    if((raw&4) && (!(s->raw&4) || !s->accepted))events|=EV_BREAK;
+    if(raw&0x70)events|=EV_ERR;
+#endif
     s->raw=raw;s->status=status;s->known=M36_NOTIFY_KNOWN;
     s->accepted++;s->tick=tick;s->error=0;
     *pending|=events&mask;return TRUE;
 }
+#ifdef COM_DIAG35
+static BOOL m36_event_mask_supported(DWORD mask)
+{return !(mask&~(EV_RXCHAR|M36_LINE_EVENTS|EV_CTS|EV_BREAK|EV_ERR));}
+static DWORD m36_notify_errors(DWORD raw)
+{return ((raw&4)?CE_BREAK:0)|((raw&0x10)?CE_FRAME:0)|((raw&0x20)?CE_RXPARITY:0)|((raw&0x40)?CE_OVERRUN:0);}
+#endif
 #endif

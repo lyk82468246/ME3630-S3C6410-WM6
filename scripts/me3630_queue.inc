@@ -37,6 +37,9 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
   if(result==1 && bytes){
    EnterCriticalSection(&p->io);
    if(!ring_push(p,stage,bytes)){error=ERROR_BUFFER_OVERFLOW;LeaveCriticalSection(&p->io);break;}
+#ifdef COM_DIAG35
+   p->lastRxTick=GetTickCount();
+#endif
    p->eventPending|=p->eventMask&EV_RXCHAR;SetEvent(p->rxReady);
 #ifdef COM_V10
    logline(L"Q_PUSH port=%lu tid=%lu ptr=%08lx bytes=%lu queued=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,bytes,p->qCount);
@@ -53,6 +56,9 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
 static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
 {
  DWORD start,limit,total=0,n,error=0;BOOL first;
+#ifdef COM_DIAG35
+ COMMTIMEOUTS snapshot;DWORD interval=0,lastArrival=0,waitLimit;BOOL immediate;
+#endif
 #ifdef COM_V15
  DWORD abortEpoch;
 #endif
@@ -65,6 +71,14 @@ static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
 #endif
  EnterCriticalSection(&p->rxIO);
  EnterCriticalSection(&p->io);limit=p->timeouts.ReadTotalTimeoutConstant;first=p->timeouts.ReadIntervalTimeout==MAXDWORD;LeaveCriticalSection(&p->io);
+#ifdef COM_DIAG35
+ EnterCriticalSection(&p->io);snapshot=p->timeouts;LeaveCriticalSection(&p->io);
+ first=snapshot.ReadIntervalTimeout==MAXDWORD && snapshot.ReadTotalTimeoutMultiplier==MAXDWORD;
+ immediate=snapshot.ReadIntervalTimeout==MAXDWORD && !snapshot.ReadTotalTimeoutMultiplier && !snapshot.ReadTotalTimeoutConstant;
+ interval=snapshot.ReadIntervalTimeout==MAXDWORD?0:snapshot.ReadIntervalTimeout;
+ if(first)limit=snapshot.ReadTotalTimeoutConstant;
+ else if(!m36_timeout_total(snapshot.ReadTotalTimeoutMultiplier,snapshot.ReadTotalTimeoutConstant,count,&limit)){LeaveCriticalSection(&p->rxIO);SetLastError(ERROR_INVALID_PARAMETER);return (DWORD)-1;}
+#endif
  start=GetTickCount();
 #ifdef COM_V10
  logline(L"Q_READ_BEGIN port=%lu tid=%lu ptr=%08lx count=%lu timeout=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,count,limit);
@@ -82,6 +96,9 @@ static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
   if(abortEpoch!=p->rxAbortEpoch){error=ERROR_OPERATION_ABORTED;LeaveCriticalSection(&p->io);break;}
 #endif
   n=ring_pop(p,(BYTE*)buffer+total,count-total);total+=n;
+#ifdef COM_DIAG35
+  if(n)lastArrival=p->lastRxTick;
+#endif
 #ifdef COM_V10
   if(n)logline(L"Q_POP port=%lu tid=%lu ptr=%08lx bytes=%lu queued=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,n,p->qCount);
 #endif
@@ -95,9 +112,17 @@ static DWORD serial_queue_read(PORT *p,LPVOID buffer,DWORD count)
   error=p->rxFailure;
   LeaveCriticalSection(&p->io);
   if((first && total) || total==count || error)break;
+#ifdef COM_DIAG35
+  if(immediate)break;
+  n=GetTickCount()-start;if(limit!=INFINITE && n>=limit)break;
+  waitLimit=20;if(limit!=INFINITE && limit-n<waitLimit)waitLimit=limit-n;
+  if(total && interval){n=GetTickCount()-lastArrival;if(n>=interval)break;if(interval-n<waitLimit)waitLimit=interval-n;}
+  n=waitLimit;
+#else
   n=GetTickCount()-start;if(n>=limit)break;
   /* Stop is checked periodically too, even while RX producer is stuck. */
   n=limit-n;if(n>20)n=20;
+#endif
 #ifdef COM_V11
   waited=WaitForSingleObject(p->rxReady,n);waitError=waited==WAIT_FAILED?GetLastError():0;
   if(!waitLogged || waited==WAIT_FAILED){logline(L"Q_WAIT port=%lu tid=%lu status=%08lx error=%lu\r\n",p->index,GetCurrentThreadId(),waited,waitError);waitLogged=TRUE;}

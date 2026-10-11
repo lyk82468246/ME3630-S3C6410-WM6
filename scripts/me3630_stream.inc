@@ -24,6 +24,9 @@ typedef struct {
     DWORD qHead,qCount,rxFailure;
 #ifdef COM_V15
     DWORD rxAbortEpoch,txQueued;
+#ifdef COM_DIAG35
+    DWORD txClearEpoch,txIssueEpoch,lastRxTick,commErrors;
+#endif
 #endif
     BYTE queue[4096];
 #ifdef COM_V12
@@ -331,7 +334,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG33
 #ifdef COM_DIAG34
 #ifdef COM_DIAG34R2
+#ifdef COM_DIAG35
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D35.dll",sizeof(L"ME3630ComV18D35.dll"));
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D34R2.dll",sizeof(L"ME3630ComV18D34R2.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D34.dll",sizeof(L"ME3630ComV18D34.dll"));
 #endif

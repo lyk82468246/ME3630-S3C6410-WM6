@@ -1,6 +1,9 @@
 /* Codes measured using native APIs on CE5.2 build20782; see ioctl-abi.txt.
  * V4 deliberately supports a bounded subset, NOT Unimodem/PPP yet.
  * V4-V6 serialize I/O; V7 separates RX/TX and snapshots configuration. */
+#ifdef COM_DIAG35
+#include "me3630_timeout.h"
+#endif
 static BOOL serial_alive(PORT *port)
 {return WaitForSingleObject(port->parent->stop,0)!=WAIT_OBJECT_0 && port->in && port->out;}
 static BOOL serial_lines(PORT *port,DWORD lines)
@@ -18,6 +21,14 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
 {
     PROBE *p=port->parent;USB_TRANSFER t;DWORD start=GetTickCount(),error;BOOL complete,expired=FALSE;
     *bytes=0;
+#ifdef COM_DIAG35
+    if(!input){
+        EnterCriticalSection(&port->io);
+        if(port->txIssueEpoch!=port->txClearEpoch){LeaveCriticalSection(&port->io);return 2;}
+        t=p->usb->lpIssueBulkTransfer(pipe,NULL,NULL,USB_NO_WAIT|USB_OUT_TRANSFER,size,buf,0);
+        LeaveCriticalSection(&port->io);
+    }else
+#endif
     t=p->usb->lpIssueBulkTransfer(pipe,NULL,NULL,USB_NO_WAIT|(input?(USB_IN_TRANSFER|USB_SHORT_TRANSFER_OK):USB_OUT_TRANSFER),size,buf,0);
     if(!t){SetLastError(ERROR_IO_DEVICE);return -1;}
     while(!p->usb->lpIsTransferComplete(t)) {
@@ -40,6 +51,9 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
 static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
     DWORD start,limit,total=0,n,bytes;BOOL first;int result;
+#ifdef COM_DIAG35
+    COMMTIMEOUTS snapshot;DWORD clearEpoch;
+#endif
 #ifdef COM_V13
     BYTE *stage=port->txStage;
 #else
@@ -53,6 +67,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     if(input)return serial_queue_read(port,buffer,count);
 #endif
 #ifdef COM_V7
+#ifdef COM_DIAG35
+    EnterCriticalSection(&port->io);clearEpoch=port->txClearEpoch;LeaveCriticalSection(&port->io);
+#endif
     EnterCriticalSection(direction);
 #endif
     EnterCriticalSection(&port->io);
@@ -64,6 +81,11 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
         SetLastError(ERROR_DEVICE_NOT_CONNECTED);return (DWORD)-1;
     }
     start=GetTickCount();limit=input?port->timeouts.ReadTotalTimeoutConstant:port->timeouts.WriteTotalTimeoutConstant;
+#ifdef COM_DIAG35
+    snapshot=port->timeouts;
+    port->txIssueEpoch=clearEpoch;
+    if(!m36_timeout_total(snapshot.WriteTotalTimeoutMultiplier,snapshot.WriteTotalTimeoutConstant,count,&limit)){LeaveCriticalSection(&port->io);LeaveCriticalSection(direction);SetLastError(ERROR_INVALID_PARAMETER);return (DWORD)-1;}
+#endif
     first=port->timeouts.ReadIntervalTimeout==MAXDWORD;
 #ifdef COM_V15
     port->txQueued=count;
@@ -74,12 +96,15 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     LeaveCriticalSection(&port->io);
 #endif
     while(total<count) {
+#ifdef COM_DIAG35
+        EnterCriticalSection(&port->io);n=clearEpoch!=port->txClearEpoch;LeaveCriticalSection(&port->io);if(n)break;
+#endif
         if(input && port->rxLen>port->rxPos) {
             n=port->rxLen-port->rxPos;if(n>count-total)n=count-total;
             memcpy((PBYTE)buffer+total,port->rx+port->rxPos,n);port->rxPos+=n;total+=n;
             if(first || total==count)break;
         }
-        n=GetTickCount()-start;if(n>=limit)break;
+        n=GetTickCount()-start;if(limit!=INFINITE && n>=limit)break;
         if(input) {
             port->rxPos=port->rxLen=0;
             result=serial_transfer(port,port->in,port->rx,sizeof(port->rx),TRUE,limit-n,&bytes);
@@ -95,10 +120,21 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #ifdef COM_V12
             logline(L"Q_TX port=%lu tid=%lu size=%lu expected_AT=%lu phase=%ld cycles=%ld timeouts=%ld\r\n",port->index,GetCurrentThreadId(),bytes,bytes==3 && memcmp(stage,"AT\r",3)==0,port->pumpPhase,port->pumpCycles,port->pumpTimeouts);
 #endif
+#ifdef COM_DIAG35
+            result=serial_transfer(port,port->out,stage,bytes,FALSE,limit==INFINITE?5000:limit-n,&bytes);
+#else
             result=serial_transfer(port,port->out,stage,bytes,FALSE,limit-n,&bytes);
+#endif
             if(result==1)total+=bytes;
+#ifdef COM_DIAG35
+            if(result==2)break;
+#endif
 #ifdef COM_V15
-            EnterCriticalSection(&port->io);port->txQueued=result<0?0:count-total;LeaveCriticalSection(&port->io);
+            EnterCriticalSection(&port->io);port->txQueued=result<0?0:count-total;
+#ifdef COM_DIAG35
+            if(clearEpoch!=port->txClearEpoch)port->txQueued=0;
+#endif
+            LeaveCriticalSection(&port->io);
 #endif
         }
         if(result<0){
@@ -109,7 +145,12 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #endif
             return (DWORD)-1;
         }
-        if(result==0)break;
+        if(result==0){
+#ifdef COM_DIAG35
+            if(limit==INFINITE)continue;
+#endif
+            break;
+        }
     }
 #ifdef COM_V15
     EnterCriticalSection(&port->io);port->txQueued=0;LeaveCriticalSection(&port->io);
@@ -123,6 +164,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 }
 #ifdef COM_V8
 #include "me3630_events.inc"
+#endif
+#ifdef COM_DIAG35
+#include "me3630_purge.inc"
 #endif
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
@@ -147,7 +191,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG34R2
+#ifdef COM_DIAG35
+            *(DWORD*)out=35;
+#elif defined(COM_DIAG34R2)
             *(DWORD*)out=3402;
 #else
             *(DWORD*)out=34;
@@ -210,7 +256,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
         if(!in || inSize!=sizeof(DWORD))break;
         memcpy(&lines,in,sizeof(DWORD));
 #ifdef COM_V18
+#ifdef COM_DIAG35
+        if(!m36_event_mask_supported(lines)){error=ERROR_NOT_SUPPORTED;break;}
+#else
         if(lines&~(EV_RXCHAR|M36_LINE_EVENTS)){error=ERROR_NOT_SUPPORTED;break;}
+#endif
 #else
         if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
 #endif
@@ -224,6 +274,9 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     case 0x001b0030: /* Measured ABI: DWORD errors + 12-byte COMSTAT. */
         if(out && outSize>=sizeof(DWORD)+sizeof(COMSTAT)) {
             COMSTAT stat;DWORD errors=port->rxFailure?CE_IOE:0;
+#ifdef COM_DIAG35
+            errors|=port->commErrors;port->commErrors=0;
+#endif
             memset(&stat,0,sizeof(stat));stat.cbInQue=port->qCount;stat.cbOutQue=port->txQueued;
             memcpy(out,&errors,sizeof(errors));memcpy(out+sizeof(errors),&stat,sizeof(stat));
             if(actual)*actual=sizeof(errors)+sizeof(stat);ok=TRUE;
@@ -231,7 +284,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     case 0x001b0044: /* Only RX actions; validate entire mask before mutation. */
         if(!in || inSize!=sizeof(DWORD))break;
         memcpy(&lines,in,sizeof(lines));if(!lines)break;
+#ifdef COM_DIAG35
+        ok=m36_purge_host_buffers(port,lines);if(!ok)error=ERROR_NOT_SUPPORTED;break;
+#else
         if(lines&~(PURGE_RXCLEAR|PURGE_RXABORT)){error=ERROR_NOT_SUPPORTED;break;}
+#endif
         if(lines&PURGE_RXCLEAR) {
             port->qHead=port->qCount=0;port->eventPending&=~EV_RXCHAR;
             ResetEvent(port->rxReady);if(!(port->eventPending&port->eventMask))ResetEvent(port->eventWake);
@@ -255,10 +312,14 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     case 0x001b003c: /* SetCommTimeouts: total-only or first-byte special mode. */
         if(!in || inSize!=sizeof(COMMTIMEOUTS))break;
         memcpy(&timeouts,in,sizeof(timeouts));
+#ifdef COM_DIAG35
+        if(!m36_timeout_valid(&timeouts)){error=ERROR_NOT_SUPPORTED;break;}
+#else
         if(!((timeouts.ReadIntervalTimeout==0 && timeouts.ReadTotalTimeoutMultiplier==0) ||
           (timeouts.ReadIntervalTimeout==MAXDWORD && timeouts.ReadTotalTimeoutMultiplier==MAXDWORD)) ||
           !timeouts.ReadTotalTimeoutConstant || timeouts.ReadTotalTimeoutConstant>10000 ||
           timeouts.WriteTotalTimeoutMultiplier!=0 || !timeouts.WriteTotalTimeoutConstant || timeouts.WriteTotalTimeoutConstant>10000) {error=ERROR_NOT_SUPPORTED;break;}
+#endif
         port->timeouts=timeouts;ok=TRUE;break;
     case 0x001b000c:case 0x001b0010:case 0x001b0014:case 0x001b0018:
         lines=port->lines;

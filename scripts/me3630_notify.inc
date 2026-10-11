@@ -34,6 +34,9 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
         EnterCriticalSection(&port->io);
 #ifdef COM_V18
         m36_update_notify(&port->notifyState,data,bytes,port->index,GetTickCount(),port->eventMask,&port->eventPending);
+#ifdef COM_DIAG35
+        if(valid)port->commErrors|=m36_notify_errors(raw);
+#endif
         if(port->eventPending&port->eventMask)SetEvent(port->eventWake);
 #else
         if(valid) {

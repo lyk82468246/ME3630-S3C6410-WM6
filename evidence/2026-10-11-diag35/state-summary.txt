@@ -1,0 +1,12 @@
+Read-only Active/USB registry probe after D35 install:
+ACTIVE_ME3630_PORT_BLOCKS=0
+Own exact match: Drivers\USB\LoadClients\6610_5170\Default\Default\ME3630Probe
+DLL=ME3630ComV18D35.dll
+HCD1: still present (Drivers\BuiltIn\OHCI)
+Full registry inventory remains local, not included.
+
+Driver accumulated trace collected after user-confirmed replug:
+Last DETACH tick1719836; RX/notification joins complete by1719938.
+No new ATTACH following that trace window.
+Do not confuse registry matching success with actual DLL activation.
+Both new guarded RAS tests exited before RasDial because COM5 was absent.
