@@ -11,6 +11,11 @@ typedef struct {
     CRITICAL_SECTION rxIO,txIO;
 #endif
     LONG refs,opened;
+#ifdef COM_V9
+    HANDLE rxThread,rxReady,eventWake;
+    DWORD qHead,qCount,rxFailure;
+    BYTE queue[4096];
+#endif
 #ifdef COM_V8
     DWORD eventMask,eventEpoch,eventPending;
     LONG eventWaiter;
@@ -34,6 +39,11 @@ static void port_release(PORT *port)
 {
     if(InterlockedDecrement(&port->refs)==0) {
         PROBE *p=port->parent;
+#ifdef COM_V9
+        if(port->rxThread)CloseHandle(port->rxThread);
+        if(port->rxReady)CloseHandle(port->rxReady);
+        if(port->eventWake)CloseHandle(port->eventWake);
+#endif
 #ifdef COM_V7
         DeleteCriticalSection(&port->rxIO);DeleteCriticalSection(&port->txIO);
 #endif
@@ -67,6 +77,9 @@ BOOL M36_Close(DWORD context)
     PORT *port=(PORT*)context;
 #ifdef COM_V8
     EnterCriticalSection(&port->io);port->eventMask=0;port->eventPending=0;port->eventEpoch++;
+#ifdef COM_V9
+    SetEvent(port->eventWake);
+#endif
     LeaveCriticalSection(&port->io);
 #endif
     InterlockedExchange(&port->opened,0);port_release(port);return TRUE;
@@ -134,6 +147,10 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V7
         InitializeCriticalSection(&port->rxIO);InitializeCriticalSection(&port->txIO);
 #endif
+#ifdef COM_V9
+        port->rxReady=CreateEvent(NULL,TRUE,FALSE,NULL);port->eventWake=CreateEvent(NULL,TRUE,FALSE,NULL);
+        if(!port->rxReady || !port->eventWake){logline(L"V9 EVENT_CREATE_FAILED\r\n");continue;}
+#endif
 #ifdef COM_V4
         port->lines=3;port->dcb.DCBlength=sizeof(DCB);port->dcb.BaudRate=115200;port->dcb.ByteSize=8;port->dcb.fBinary=TRUE;
         port->dcb.fDtrControl=DTR_CONTROL_ENABLE;port->dcb.fRtsControl=RTS_CONTROL_ENABLE;
@@ -147,12 +164,25 @@ static DWORD WINAPI worker(LPVOID param)
         request.wValue=3;request.wIndex=(USHORT)port->index;
         t=p->usb->lpIssueVendorTransfer(p->device,NULL,NULL,USB_OUT_TRANSFER|USB_NO_WAIT|USB_SEND_TO_INTERFACE,&request,NULL,0);
         if(!wait_transfer(p,t,1000,&bytes))continue;
+#ifdef COM_V9
+        InterlockedIncrement(&port->refs);
+        port->rxThread=CreateThread(NULL,0,serial_rx_pump,port,0,NULL);
+        if(!port->rxThread){port_release(port);logline(L"V9 RX_THREAD_FAILED\r\n");continue;}
+#endif
 #ifdef COM_V4
 #ifdef COM_V5
 #ifdef COM_V6
 #ifdef COM_V7
 #ifdef COM_V8
+#ifdef COM_V9
+#ifdef COM_V10
+        wsprintfW(path,L"Drivers\\ME3630ComV10\\Port%lu",port->index);
+#else
+        wsprintfW(path,L"Drivers\\ME3630ComV9\\Port%lu",port->index);
+#endif
+#else
         wsprintfW(path,L"Drivers\\ME3630ComV8\\Port%lu",port->index);
+#endif
 #else
         wsprintfW(path,L"Drivers\\ME3630ComV7\\Port%lu",port->index);
 #endif
@@ -176,7 +206,15 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V6
 #ifdef COM_V7
 #ifdef COM_V8
+#ifdef COM_V9
+#ifdef COM_V10
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV10.dll",sizeof(L"ME3630ComV10.dll"));
+#else
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV9.dll",sizeof(L"ME3630ComV9.dll"));
+#endif
+#else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV8.dll",sizeof(L"ME3630ComV8.dll"));
+#endif
 #else
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV7.dll",sizeof(L"ME3630ComV7.dll"));
 #endif
@@ -206,7 +244,15 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_V6
 #ifdef COM_V7
 #ifdef COM_V8
+#ifdef COM_V9
+#ifdef COM_V10
+    logline(L"V10 READY duplex=1 queue=4096 diagnostic=1\r\n");
+#else
+    logline(L"V9 READY duplex=1 queue=4096 events=RXCHAR\r\n");
+#endif
+#else
     logline(L"V8 READY duplex=1 events=RXCHAR\r\n");
+#endif
 #else
     logline(L"V7 READY duplex=1\r\n");
 #endif
@@ -228,6 +274,15 @@ static void stream_cleanup(PROBE *p)
     DWORD i;PORT *port;
     for(i=0;i<p->count;i++) {
         port=(PORT*)p->ports[i];if(!port)continue;
+#ifdef COM_V9
+        if(port->rxThread) {
+            DWORD joined=WaitForSingleObject(port->rxThread,5000);
+            logline(L"V9 RX_JOIN interface=%lu wait=%lu\r\n",port->index,joined);
+            /* Retain base references/pipes if the host call did not unwind.
+             * Never kill a worker or free USB buffer/context underneath it. */
+            if(joined!=WAIT_OBJECT_0){logline(L"V9 RETAIN_STUCK_PORT interface=%lu\r\n",port->index);continue;}
+        }
+#endif
         if(port->active && port->active!=INVALID_HANDLE_VALUE)DeactivateDevice(port->active);
 #ifdef COM_V7
         /* stop is already signalled: pending USB waits leave before pipe close.

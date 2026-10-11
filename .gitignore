@@ -12,6 +12,7 @@ __pycache__/
 /evidence/**/windows-files.json
 /evidence/**/directories.txt
 /evidence/**/USBDeviceInfo.txt
+/evidence/**/usb-registry-local.txt
 /evidence/**/usb-config-before/
 # ATI includes the module identifier. Keep raw responses local.
 /evidence/2026-10-11-stream-v3/test-raw.txt
@@ -20,5 +21,7 @@ __pycache__/
 /evidence/2026-10-11-com-v6/test-raw.txt
 /evidence/2026-10-11-com-v7/test-raw.txt
 /evidence/2026-10-11-com-v8/test-raw.txt
+/evidence/2026-10-11-com-v9/test-raw.txt
+/evidence/2026-10-11-com-v10/test-raw.txt
 # Accumulated trace; publish only the bounded stability window.
 /evidence/2026-10-11-stability/driver-v5.txt

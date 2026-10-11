@@ -51,6 +51,9 @@ static void control_test(HANDLE log,HANDLE port,LPCWSTR name)
 #ifdef COM_V8
 #include "event_test.inc"
 #endif
+#ifdef COM_V9
+#include "queue_test.inc"
+#endif
 void mainCRTStartup(void)
 {
     HANDLE log,port;DWORD i,j,bytes,n,error,total,attempt,passed=0;BOOL ok;WCHAR name[16],line[768];BYTE rx[2048];
@@ -63,7 +66,15 @@ void mainCRTStartup(void)
 #ifdef COM_V6
 #ifdef COM_V7
 #ifdef COM_V8
+#ifdef COM_V9
+#ifdef COM_V10
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v10.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#else
+    log=CreateFile(L"\\Temp\\ME3630-com-test-v9.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
+#else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v8.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
+#endif
 #else
     log=CreateFile(L"\\Temp\\ME3630-com-test-v7.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);
 #endif
@@ -85,6 +96,9 @@ void mainCRTStartup(void)
     n=wsprintfW(line,L"KEEP_AWAKE_DIAGNOSTIC start_tick=%lu wait=25s\r\n",GetTickCount());
 #endif
     WriteFile(log,line,n*sizeof(WCHAR),&bytes,NULL);
+#ifdef COM_V9
+    ring_test(log);
+#endif
     /* Temporary diagnostic only: no persistent power policy changes. */
 #ifndef COM_V4
     for(i=0;i<25;i++){SystemIdleTimerReset();Sleep(1000);}
@@ -109,7 +123,14 @@ void mainCRTStartup(void)
 #ifdef COM_V8
             if(port!=INVALID_HANDLE_VALUE) {
                 DWORD version=0,actual=0;
-                if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,sizeof(version),&actual,NULL) || version!=8 || actual!=4){CloseHandle(port);port=INVALID_HANDLE_VALUE;error=ERROR_REVISION_MISMATCH;}
+                DWORD expectedVersion=8;
+#ifdef COM_V9
+                expectedVersion=9;
+#ifdef COM_V10
+                expectedVersion=10;
+#endif
+#endif
+                if(!DeviceIoControl(port,0x00223ffc,NULL,0,&version,sizeof(version),&actual,NULL) || version!=expectedVersion || actual!=4){CloseHandle(port);port=INVALID_HANDLE_VALUE;error=ERROR_REVISION_MISMATCH;}
                 else {n=wsprintfW(line,L"INSTANCE_VERSION port=%s version=%lu bytes=%lu\r\n",name,version,actual);WriteFile(log,line,n*2,&bytes,NULL);}
             }
 #endif
@@ -155,6 +176,9 @@ void mainCRTStartup(void)
 #ifdef COM_V8
         event_test(log,port);
 #endif
+#ifdef COM_V9
+        queue_test(log,port);
+#endif
         CloseHandle(port);
     }
     n=wsprintfW(line,L"\r\nCOMMANDS_PASSED=%lu/4 COMPLETE\r\n",passed);
@@ -165,7 +189,11 @@ void mainCRTStartup(void)
 #ifdef COM_V4
 #ifdef COM_V7
 #ifdef COM_V8
+#ifdef COM_V9
+    ExitProcess(passed==4 && failures==0 && checks==102?0:1);
+#else
     ExitProcess(passed==4 && failures==0 && checks==68?0:1);
+#endif
 #else
     ExitProcess(passed==4 && failures==0 && checks==44?0:1);
 #endif

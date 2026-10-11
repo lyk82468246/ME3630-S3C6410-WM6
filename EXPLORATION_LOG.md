@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-11：V9 并发失败、V10 等待枚举、队列隔离实机通过
+
+用户要求继续开发、及时推送。新增 me3630_ring.inc、me3630_queue.inc：每端口后台接收泵与4096字节环形队列，ReadFile和WaitCommEvent分离等待；200ms有界USB接收，不覆盖未读本地数据。增加接收线程引用及拔出join，保留旧版本。构建/部署脚本支持V9/V10、验证实例版本和新start_tick。queue_test.inc复用生产ring，增加6项环形队列及每端口14项并发/未读缓冲回归，目标102项。
+
+V9真实实机tick14794842：COM1/COM5均INSTANCE_VERSION9 bytes4；AT/ATI4/4，CONTROL_CHECKS102 FAILURES6 COMPLETE。两个后台读线程约4002-4036ms返回0字节，写2ms、配置13-14ms；同时事件/读取也失败，事件由测试最终取消。环形队列6项、再次等待期间读出剩余5字节的回归通过。没有放宽断言，也不能归因于后来掉线。后续DETACH14933735，两个RX_JOIN均wait0；不证明所有拆卸竞态安全。证据evidence/2026-10-11-com-v9，原始ATI仅本地，发布test脱敏。
+
+V10仅增加队列入队/出队/读开始结束、线程和临时上下文诊断，并非已确认修复。安装dll_load1 installed1 error0，tick15063535；DLL SHA256=8df2116a79abec61217e447119759d951c41ee5843c629c36bdfa0b667b7f67d。用户拔插并等待30秒后再次运行deploy_com.ps1 -Version10 -Test，40秒内仍无READY，未启动USB测试。probe_active.ps1 -UsbState只读核验：LoadClients6610_5170指向V10、HCD1活动、ME3630活动端口0；随后PullOnly仍仅INSTALL，无ATTACH。USBDeviceInfo历史端点日志不能证明当前枚举。用户确认无驱动窗口，板上只有高频传输时亮的通信灯，不能以不亮判断电源状态。没有重启WM6或主控、没有更改WMDC/LeadCore/SIM/RF/APN/IMEI。
+
+为了在无枚举情况下继续验证，新增queue_unit.c/run_queueunit.ps1：实机单进程复用生产ring/pump/read，只替换USB传输为确定性模拟输入，不注册驱动、不操作USB或串口。Joe实际32位WMDC运行tick15505883，10项全部通过，包括待决后台读收到6字节、事件独立保留、1+5字节完整读取、总超时部分返回、空读0、stop退出读和接收线程。证据evidence/2026-10-11-queue-unit/test.txt。这不能验证Device Manager调用上下文、跨进程映射、USB期限取消或实机并发收发；V9六个失败仍未解决。下一步需要恢复模块枚举后读取V10诊断；若需WM6软复位，应先获得用户同意，避免擅自中断其他程序和WMDC。
+
 ## 2026-10-11：V8 RXCHAR 事件子集首次通过
 
 用户要求继续开发。复核先前实机ioctl-abi.txt：GetCommMask001b0024、SetCommMask001b0028、WaitCommEvent001b002c，DWORD缓冲。实现V8独立驱动/注册表/安装器/日志，保留V7回退。新增me3630_events.inc，只支持0/EV_RXCHAR掩码；不支持位明确error50且保留原配置。等待不持配置锁，使用200ms有界USB读片段将数据留在512字节缓冲，事件返回后ReadFile读取；mask generation变化或零掩码成功返回零，拔出/传输失败明确报错，不伪造事件。单等待者限制errorBUSY，等待期间增加端口引用。Close改变掩码代数释放等待。保留V7收发并发及只读ADB诊断。

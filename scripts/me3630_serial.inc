@@ -33,6 +33,10 @@ static int serial_transfer(PORT *port,USB_PIPE pipe,LPVOID buf,DWORD size,BOOL i
     if(expired){SetLastError(0);return 0;}
     SetLastError(ERROR_IO_DEVICE);return -1;
 }
+#ifdef COM_V9
+#include "me3630_ring.inc"
+#include "me3630_queue.inc"
+#endif
 static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 {
     DWORD start,limit,total=0,n,bytes;BOOL first;int result;BYTE stage[512];
@@ -40,6 +44,9 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
     CRITICAL_SECTION *direction=input?&port->rxIO:&port->txIO;
 #endif
     if(!count)return 0;
+#ifdef COM_V9
+    if(input)return serial_queue_read(port,buffer,count);
+#endif
 #ifdef COM_V7
     EnterCriticalSection(direction);
 #endif
@@ -114,14 +121,26 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     switch(code) {
 #ifdef COM_V8
     case 0x00223ffc: /* Private version query, not a CE serial IOCTL. */
+#ifdef COM_V9
+#ifdef COM_V10
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=10;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
+        if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=9;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
+#else
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=8;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
     case 0x001b0024: /* GetCommMask, measured on this ROM. */
         if(out && outSize>=sizeof(DWORD)){memcpy(out,&port->eventMask,sizeof(DWORD));if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
     case 0x001b0028: /* SetCommMask: only RXCHAR and zero are supported. */
         if(!in || inSize!=sizeof(DWORD))break;
         memcpy(&lines,in,sizeof(DWORD));
         if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
-        port->eventMask=lines;port->eventEpoch++;port->eventPending=0;ok=TRUE;break;
+        port->eventMask=lines;port->eventEpoch++;port->eventPending=0;
+#ifdef COM_V9
+        SetEvent(port->eventWake);
+#endif
+        ok=TRUE;break;
 #endif
     case 0x001b0050: /* GetCommState */
         if(out && outSize>=sizeof(DCB)){memcpy(out,&port->dcb,sizeof(DCB));if(actual)*actual=sizeof(DCB);ok=TRUE;}break;
