@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-12：评估先在Win11调通再移植WM6的可行性（仅方案，无设备变更）
+
+用户询问调制解调器API是否高度一致、能否PC调通后微调重编译。核对ras_saved.c、me3630_com.def/open.inc及微软原始接口文档：AT/APN/拨号响应和协议状态机可设计为共享C核心；CreateFile/ReadFile/SetCommState等上层名称相近，但CE不支持FILE_FLAG_OVERLAPPED，RAS通知/配置也不能照搬。CE RasDial文档要求异步窗口通知NotifierType FFFFFFFF、连接条目存注册表；桌面文档支持RASDIALFUNC系列及PBK。此前桌面回调误用于CE返回87、改HWND后被接受的历史，正是具体反例，不是今日新硬件结果。
+
+底层模型不同：当前CE DLL实现USBDeviceAttach/USB_FUNCS与COM_*流入口，NT桌面USB驱动采用其自身PnP/框架/安装模型。现有32位DWORD指针上下文、CE专用IOCTL、生命周期/同步取消亦不可视为x64源码原样可编译。Win11若使用厂商串口驱动联网，只能建立模块/SIM/APN/PPP的对照，不能证明自研CE驱动、S3C6410 OHCI/供电及热插拔问题已解决。Win11用MBIM联网也不能验证本项目串口PPP路线；ADB枚举不是COM调制解调器就绪的证据。未声称本模块当前vendor-specific串口会自动匹配Usbser.sys。
+
+建议（未实施）：在相同模块模式下先建立串口PPP基准、记录AT往返/CONNECT/PPP阶段，抽出纯协议/队列/事件状态核心；分别保留Win11串口/测试适配层和WM6 USB/COM/RAS适配层。PC可加速核心回归和定位协议问题，CE实机仍必须验证Unimodem交接、取消/拔插与重新枚举；不承诺整个驱动仅需微调重编译，也不为此默认新写一套Win11驱动。此轮仅研究和记录，无模式切换/安装/拨号/服务或设备写动作。
+
+主来源：CE5 RasDial https://learn.microsoft.com/en-us/previous-versions/windows/embedded/aa450834(v=msdn.10)；桌面RasDialW https://learn.microsoft.com/en-us/windows/win32/api/ras/nf-ras-rasdialw；CE5 CreateFile https://learn.microsoft.com/en-us/previous-versions/windows/embedded/aa517318(v=msdn.10)；CE5 USBDeviceAttach https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms923216(v=msdn.10)；桌面USB框架 https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/implement-driver-entry-for-a-usb-driver--umdf-；Usbser类匹配 https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-driver-installation-based-on-compatible-ids 。
+
 ## 2026-10-12：继续尝试被PC端WMDC会话阻断，未重启或改WM6
 
 用户要求继续尝试，按Asia/Shanghai客户端日期新建evidence/2026-10-12-retry，先以Joe32位PowerShell运行probe_active -UsbState：CeRapiInitEx在30s内无就绪会话。本日没有读取到WM6注册表/模块端口状态，不把昨日Active0当今日实测。Windows只读Get-Service确认WcesComm和RapiMgr均Stopped；Get-PnpDevice -PresentOnly看到Microsoft Windows Mobile Remote Adapter状态OK，这仅是WMDC Function侧USB设备，不是ME3630已被WM6 Host枚举的证据，Bluetooth设备支持项亦无关。
