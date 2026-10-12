@@ -53,7 +53,7 @@ static void ras_devices(void)
 void mainCRTStartup(void)
 {
     HANDLE port=INVALID_HANDLE_VALUE;DWORD begin=GetTickCount(),version,actual,i,generation=0;BOOL completed=FALSE;COMMTIMEOUTS timeouts;
-    static const char *commands[]={"AT\r","AT+CFUN?\r","AT+CPIN?\r","AT+CSQ\r","AT+COPS?\r","AT+CREG?\r","AT+CEREG?\r","AT+CGATT?\r","AT+CGDCONT?\r","AT+CGACT?\r"};
+    static const char *commands[]={"AT\r","AT+CFUN?\r","AT+CPIN?\r","AT+CSQ\r","AT+COPS?\r","AT+CREG?\r","AT+CEREG?\r","AT+CGATT?\r","AT+CGDCONT?\r","AT+CGACT?\r","AT+ZSWITCH?\r","AT+ZADSET?\r","AT+ZECMCALL?\r","AT+ZNVREAD=auto_dial_mode\r","AT+ZNVREAD=ecmcall_urc\r","AT+ZIPCFG?\r","AT+ZIPCALL?\r","AT+ZPAS?\r","AT+ZSNT?\r"};
     logFile=CreateFile(L"\\Temp\\ME3630-network-probe.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
     emit(L"NETWORK_PROBE start_tick=%lu read_only=1 duration=60s\r\n",begin);ras_devices();
     while(GetTickCount()-begin<60000) {

@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-12：核验固件现成联网模式与自动拨号能力
+
+用户提出可能无需在WM6上把ME3630配置成复杂通用Modem，而直接利用固件网络模式。联网核对GOSUNCN ME3630 AT Command Reference Guide第12.8节和第10.2节，并检查本地原始WinCE6 `USBManager.reg`：固件定义了四类USB组合。`x+n`/PID 19d2:1432是Windows XP/7/Vista/WinCE NDIS（DIAG、AT、MODEM、NDIS、ADB）；`x+r`是RNDIS；`l+e`/PID 19d2:1476是Linux/Android ECM；`8`/PID 0602是MBIM。用户提供的WinCE6包对1432只注册AT/MODEM/DEBUG串口类，没有可用的ZTEUSBNDIS_CLASS项；这不能证明所有厂商版本都没有NDIS，但证明手头包不是现成的1432网络适配方案。WM6历史快照还未找到主机USB8023/RNDISMP，已有rndisfn.dll属于WMDC设备功能侧，不能当作主机RNDIS驱动。
+
+WMDC恢复后，以Joe的32位RAPI只读采集：`scripts/probe_active.ps1 -UsbState -OutDir evidence/2026-10-12-restored-wmdc`确认本项目自己的COM1/COM5活动，HCD1仍为OHCI；随后扩展只读`network_probe.c`查询`ZSWITCH?`、`ZADSET?`、`ZECMCALL?`、`ZNVREAD=auto_dial_mode`、`ZNVREAD=ecmcall_urc`、`ZIPCFG?`、`ZIPCALL?`、`ZPAS?`、`ZSNT?`，运行`scripts/run_networkprobe.ps1 -OutDir evidence/2026-10-12-network-probe-restored`。实际返回`ZSWITCH:x`、`ZADSET:n`，确认当前为x+n/NDIS；两个auto-dial NV查询均ERROR，符合手册只在较新J2版本支持的限制，不把自动拨号能力归给当前C1AV2.0B01。`ZIPCFG?`为空、`ZIPCALL?`为0，表明内部PS/socket命令可查询但未配置/未启动；没有执行设置APN或拨号。当前仍为CPIN READY、CSQ99/99、CREG/CEREG0/2、CGATT0、ZPAS NO SERVICE，不能把未联网归因于USB模式。
+
+结论：若目标是系统范围透明上网，优先保留官方WinCE标注的x+n并单独解决WM6主机侧USB NDIS miniport；只凭NDIS.DLL或WMDC的rndisfn.dll不够。x+r/RNDIS、l+e/ECM和8/MBIM都不能绕过主机协议驱动，MBIM尤其不适合作为WM6捷径。若目标只是自有应用访问服务器，可进一步在不经过PPP/RAS的前提下评估`ZIPCFG`/`ZIPCALL`/`ZIPOPEN`模块内部socket；它不会给WM6系统创建网卡。详细路线与限制见`scripts/MODE_AUTO_NETWORK.md`。本轮只读，未切模式、改APN、拨号、重启或更改保存的RAS条目。
+
+主资料：GOSUNCN ME3630 AT Command Reference Guide https://welinkjapan.co.jp/pdf/GOSUNCN%20AT%20Command%20Reference%20Guide%20of%20Module%20Product%20ME3630.pdf 。
+
 ## 2026-10-12：评估先在Win11调通再移植WM6的可行性（仅方案，无设备变更）
 
 用户询问调制解调器API是否高度一致、能否PC调通后微调重编译。核对ras_saved.c、me3630_com.def/open.inc及微软原始接口文档：AT/APN/拨号响应和协议状态机可设计为共享C核心；CreateFile/ReadFile/SetCommState等上层名称相近，但CE不支持FILE_FLAG_OVERLAPPED，RAS通知/配置也不能照搬。CE RasDial文档要求异步窗口通知NotifierType FFFFFFFF、连接条目存注册表；桌面文档支持RASDIALFUNC系列及PBK。此前桌面回调误用于CE返回87、改HWND后被接受的历史，正是具体反例，不是今日新硬件结果。
