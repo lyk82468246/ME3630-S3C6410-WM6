@@ -1,0 +1,59 @@
+ME3630 D40 x+n USB observation
+Date: 2026-10-12 (Asia/Shanghai)
+
+Scope
+-----
+The module was reported reconfigured to the WM6 x+n composition and reinserted
+into the WM6 USB host. Tests used Joe's 32-bit WMDC/RAPI PowerShell session.
+No WM6 reboot, mode change, APN write, SIM change, or module reset was issued.
+
+Commands/tools
+--------------
+- scripts/probe_active.ps1 -UsbState
+- scripts/collect_network_state.ps1 (read-only driver-log pull)
+- scripts/run_networkprobe.ps1 -OutDir evidence/2026-10-12-d40-radio
+- scripts/run_rassaved.ps1 -Dial -ExpectedDiagnostic 39
+- twelve probe_active samples at roughly five-second intervals
+
+Observed
+--------
+- The active registry mapping remained
+  19d2:1432 / 6610_5170 -> ME3630ComV18D40.dll.
+- The initial attach snapshot and the 25-second retry both reported
+  ACTIVE_ME3630_PORT_BLOCKS=0. The 60-second watch also reported 0 for all
+  twelve samples. This is a point-in-time result, not proof that the module
+  never enumerated.
+- The accumulated driver trace contains a D40 installation followed by real
+  19d2:1432 attach events. Representative events show COM1 and COM5
+  activation, V18 READY, the 00223ffc identity request, and a 001b0034
+  GetCommModemStatus request. The D40 trace has no old D39 error=50 return for
+  those observed status requests.
+- The same trace then shows RX_EXIT error=1117 or 1167, USB error 257 in some
+  cycles, and DETACH. Later attach attempts repeat. These are USB/device-link
+  failures after activation, not a missing registry match.
+- The read-only network probe ran for 180 seconds and recorded
+  generations=0, all_queries=0. It only enumerated the existing RAS device
+  Cellular Line; it sent no AT command to ME3630.
+- The guarded RAS attempt found exactly one matching saved entry:
+  ME3630 Test COM5, *99***2#, PPP/IPv4. It returned PORT_UNAVAILABLE
+  error=55 after its 30-second bounded wait, so RasDial was not called.
+
+Conclusion
+----------
+D40's GetCommModemStatus implementation is not the current blocking evidence:
+the driver can enumerate and activate the vendor-specific interfaces when the
+USB link stays present. During this observation the module did not remain
+enumerated long enough for a COM5/RAS handoff. Given the independent user
+baseline that the same module reaches the Internet in MBIM mode on Win11, the
+next highest-value A/B test is compliant external power or a powered USB host
+path for the WM6 setup. Do not feed raw 5 V into the module's 3.0--4.0 V main
+rail. If a stable powered path produces CPIN/CSQ/registration and COM5, rerun
+the same saved RAS entry; only then is further PPP/Unimodem code work justified.
+
+Detailed local traces
+---------------------
+- evidence/2026-10-12-d40-attach-retry/ (registry/USB snapshot; inventories are local/ignored)
+- evidence/2026-10-12-d40-watch/ (twelve local point-in-time snapshots)
+- evidence/2026-10-12-d40-radio/test.txt
+- evidence/2026-10-12-d40-ras-dial/dial.txt
+- evidence/2026-10-11-network-probe/driver-local.txt (full accumulated driver log; local/ignored)

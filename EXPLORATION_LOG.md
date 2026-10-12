@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-12：D40 在 x+n 下能枚举并激活，但本轮 USB 链路无法保持
+
+用户将模块切回 WM6 使用的 `x+n`（19d2:1432）并重新插入。使用 Joe 的 32 位 WMDC/RAPI 会话运行 `scripts/probe_active.ps1 -UsbState`：初始快照和等待25秒后的重试均为 `ACTIVE_ME3630_PORT_BLOCKS=0`；随后约60秒、每5秒一次的12个采样也全部为0。注册表匹配仍明确指向 `ME3630ComV18D40.dll`，所以这些0只能表示采样时没有活动端口，不能单独证明模块从未枚举。
+
+重新读取驱动日志后得到更有区分度的当前设备证据：D40安装后确实收到 `ATTACH vid=19d2 pid=1432`，随后多次成功激活 `COM1`、`COM5` 并记录 `V18 READY`；激活期间还出现版本握手 `00223ffc` 和 `GetCommModemStatus` 的 `001b0034` 请求。D40这几次状态请求没有再出现旧D39的 `error=50 / ERROR_NOT_SUPPORTED` 返回。随后各轮出现 `RX_EXIT error=1117` 或 `1167`、部分轮次 `usb_error=257`，最后 `DETACH`，并开始下一次ATTACH。结论是D40不是“没有匹配/完全不能加载”，而是USB设备在激活后反复失联；完整累积日志仍按本地证据保留，聚焦摘要见 `evidence/2026-10-12-d40-usb-observation/observation.txt`。
+
+使用 `scripts/run_networkprobe.ps1 -OutDir evidence/2026-10-12-d40-radio` 做180秒只读探针，结果 `generations=0 all_queries=0`，期间没有一次COM1通过身份检查并保持到发AT；RAS枚举只看到既有的 `Cellular Line`。随后用 `scripts/run_rassaved.ps1 -Dial -ExpectedDiagnostic 39 -OutDir evidence/2026-10-12-d40-ras-dial` 做一次有界拨号：保存条目唯一匹配 `ME3630 Test COM5`、`*99***2#`、PPP/IPv4，但等待30秒后 `PORT_UNAVAILABLE error=55`，因此 `RasDial` 实际没有被调用，没有修改连接条目。
+
+本轮已验证：D40的调制解调器状态接口修复不是当前首要阻塞；当前阻塞发生在COM5/RAS交接之前的USB端口保持。结合用户提供的同一模块在Win11 MBIM下可上网的对照，下一次最高价值的A/B是给WM6 Host/转接板提供合规的外部供电或有源USB路径，再重复同一只读无线探针和保存RAS条目。ME3630主电源仍必须是模块要求的3.0--4.0V，不能把USB 5V直接送入模块主电源。若供电改善后能稳定得到 `CPIN/CSQ/CREG` 与COM5，再继续PPP/Unimodem握手分类；在当前没有稳定端口的情况下继续改RAS代码没有诊断价值。
+
 ## 2026-10-12：整机 PPP 路线已进入 RAS，当前阻塞收敛为无线未注册
 
 用户要求目标是“整个 WM6 上网”，因此本轮优先验证系统级 PPP/RAS，而不是继续把应用级 socket 封装成虚拟网卡。WMDC 已恢复，使用 Joe 身份的 32 位 RAPI（`C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`）只读检查活动端口：本项目自己的 ME3630 COM1/COM5 仍由 `ME3630ComV18D39.dll` 提供，HCD1 为 S3C6410 OHCI；没有把 WMDC Function 侧 `rndisfn.dll` 或 LeadCore 调制解调器当作 ME3630 主机网络通道。
