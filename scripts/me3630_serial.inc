@@ -330,6 +330,10 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
         if(lines&PURGE_RXABORT){port->rxAbortEpoch++;SetEvent(port->rxReady);}
         ok=TRUE;break;
 #endif
+#ifdef COM_V18
+    case 0x001b0034: /* GetCommModemStatus: expose only observed DSR/RING/RLSD. */
+        if(out && outSize>=sizeof(DWORD)){lines=m36_modem_status(&port->notifyState);memcpy(out,&lines,sizeof(lines));if(actual)*actual=sizeof(lines);ok=TRUE;}break;
+#endif
     case 0x001b0050: /* GetCommState */
         if(out && outSize>=sizeof(DCB)){memcpy(out,&port->dcb,sizeof(DCB));if(actual)*actual=sizeof(DCB);ok=TRUE;}break;
     case 0x001b0054: /* SetCommState: validate before changing physical control lines. */

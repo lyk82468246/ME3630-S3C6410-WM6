@@ -1,10 +1,25 @@
 # D39: exact configuration requests and genuine carrier observations
 
 Diagnostic only, inherits D38/D36 ownership, serial/event policy, synchronous
-cancellation and cleanup. It does NOT implement GetCommModemStatus, TXEMPTY,
-hardware flow control or a hotplug recovery fix. Public18/private39, distinct
-ME3630ComV18D39.dll and ME3630D39Lifecycle mapping. SHA256 installed9678003:
-E632C4A9FA44A43B387118332C663BD72DE7978ACDAD820C1B730F73EE28C37D
+cancellation and cleanup. It does NOT implement TXEMPTY, hardware flow control
+or a hotplug recovery fix. Public18/private39, distinct
+ME3630ComV18D39.dll and ME3630D39Lifecycle mapping. The previous installed
+9678003 build had SHA256 E632C4A9FA44A43B387118332C663BD72DE7978ACDAD820C1B730F73EE28C37D.
+The candidate rebuilt after the modem-status fix has SHA256
+B7DD1B9D05418ABE8CFF9DB9FDA37DF7ED0E629D52CB7EC102CA3BF0B30F9A93 and is
+not yet hardware-validated.
+Because the old D39 filename was locked by the loaded driver, the same fix was
+also built as the unique D40 deployment file, SHA256
+0093521D832C3913E99AFE23FEA2CA951D5D808E488D924CF7C7A119CEF75896; D40 is
+preinstalled for the next exact ME3630 attach but has not yet been tested with
+the module connected.
+
+The current source now implements the CE `GetCommModemStatus` IOCTL
+(`0x001b0034`) for V18/D39. It returns only DSR/RING/RLSD bits that were
+actually accepted from the ME3630 CDC notification endpoint; unknown CTS stays
+clear, and an as-yet-unobserved status returns zero successfully. The earlier
+D38/D39 hardware build rejected this request with error 50, so any future D39
+binary must be rebuilt and its new hash recorded before using this conclusion.
 
 ## Added event IDs61..70
 

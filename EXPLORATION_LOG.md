@@ -22,6 +22,18 @@
 
 下一步不需要先重写WM6驱动：应先确认转接板在模块端实际提供约3.0--4.0V，并能承受C1A发射/搜网时约600mA的瞬态与持续需求；确认主天线已接、SIM在手机中能注册中国电信，再保持模块上电等待`CPIN READY`后重跑只读探测。只有得到`CREG/CEREG=1/5`、数值`CSQ`和`CGATT=1`，才继续同一保存RAS条目的系统拨号；若这些条件成立而RAS仍失败，再回到PPP交接代码。
 
+## 2026-10-12：用户提供 Win11 MBIM 成功基线，重新区分驱动与供电
+
+用户报告同一模块切到MBIM后接入Win11可以正常上网；这是用户实测的对照基线，不是本任务通过RAPI采集的当前设备证据。它显著降低“SIM失效/运营商业务完全不可用/模块RF永久损坏”的可能性，但不能排除WM6 USB Host供电不足，因为Win11主机、USB口、线材和转接板供电条件可能不同，也不能证明`x+n`串口/NDIS组合在WM6上等价于MBIM。
+
+本机随后只读检查`usbipd list`，当前没有ME3630枚举，只有WMDC Remote Adapter；没有趁模块在Win11上再切换或写配置。历史WM6证据显示两个独立方向：D38第一次RAS `619`时，USB入队、`EV_RXCHAR`和多次系统Read仍成功，RAS失败前没有DETACH，说明那一轮自研串口传输至少活着到达RAS交接；D38第二次RAS `633`时出现USB完成状态5、Read错误1117、Write失败及随后DETACH/重新ATTACH，说明另一轮确有USB设备/物理链路级失效。两者不能合并成单一根因。聚焦摘要见`evidence/2026-10-11-diag38/state-summary.txt`。
+
+下一轮判别顺序：模块切回WinCE用的`x+n`并插回WM6后，先用现有D39只读采集确认是否能稳定保持`CPIN READY`/`CSQ`/注册状态；同时观察是否出现USB完成错误、DETACH或boot变化。若换成可持续供电的USB Host/外部合规3.0--4.0V电源后状态恢复，根因偏向供电/物理链路；若无线状态正常且USB无错误但同一RAS仍为619，再增加PPP握手分类日志，检查Unimodem实际发出的拨号命令和模块是否返回`CONNECT`，届时才继续改驱动的RAS交接。当前不因Win11的MBIM成功而把WM6改成MBIM，WM6仍缺主机MBIM协议栈。
+
+静态审计历史D38/D39的RAS交接日志又发现一个可直接修复的驱动缺口：Unimodem请求`GetCommModemStatus`（IOCTL `0x001b0034`）时旧实现返回`ERROR_NOT_SUPPORTED=50`。V18/D39源码现改为成功返回通知端点实际已知的`MS_DSR_ON`、`MS_RLSD_ON`、`MS_RING_ON`，未知CTS不置位；在没有任何有效通知前返回零。此改动不会伪造载波，目标是避免Unimodem因“接口不支持”提前终止RAS；尚未在本轮实机上验证，必须等模块回到WM6后用新构建重新观察`619`与PPP交接。
+
+旧D39同名DLL因仍被WM6加载而无法覆盖（RAPI设备错误5），所以生成唯一文件名`ME3630ComV18D40.dll`并只切换本项目精确匹配项。以Joe 32位RAPI完成15/15 ownership、36/36 compatibility、29/29 lifecycle隔离测试，`D40_INSTALL result=0 next_attach_only=1`；随后只读快照显示`ME3630Probe -> ME3630ComV18D40.dll`、`ACTIVE_ME3630_PORT_BLOCKS=0`。这是“候选修复已准备并预装”的证据，不是模块已在D40上成功枚举或已联网；实际硬件验证留待模块从Win11回到WM6并切回`x+n`。
+
 ## 2026-10-12：评估用内部socket封装WM6虚拟网卡
 
 用户提出把ME3630应用级联网封装成虚拟网卡以获得系统级联网。核对Windows CE 5.0 NDIS `MiniportInitialize`文档：CE API层面支持初始化物理或虚拟网络适配器；NDIS intermediate driver可以向上暴露virtual adapter。结论是“可行但不是简单包装”：系统TCP/IP发给miniport的是IP/Ethernet包，而ME3630 `ZIPCALL`/`ZIPOPEN`提供的是已建立的TCP/UDP socket。若以内部socket为后端，必须再写内核态NDIS virtual miniport、用户态IPC/网关、流到socket的NAT/代理、返回包重封装、DNS/MTU/超时/校验和/断线清理；普通应用或`NDISUIO`不能直接创建完整系统网卡。

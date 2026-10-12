@@ -57,7 +57,11 @@ void mainCRTStartup(void)
  check(L"purge_zero_reject",!m36_purge_host_buffers(&p,0));m36_purge_host_buffers(&p,PURGE_RXCLEAR);
  check(L"RAS_mask_accepted",m36_event_mask_supported(0x1f9));check(L"TXEMPTY_not_claimed",!m36_event_mask_supported(EV_TXEMPTY));check(L"RXFLAG_not_claimed",!m36_event_mask_supported(EV_RXFLAG));
  memset(&state,0,sizeof(state));state.size=sizeof(state);m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending);check(L"baseline_no_edges",pending==0 && !(state.known&MS_CTS_ON));
+ check(L"modem_status_baseline",m36_modem_status(&state)==0 && !(m36_modem_status(&state)&MS_CTS_ON));
  packet[8]=0x74;m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending);check(L"real_error_break",(pending&(EV_BREAK|EV_ERR))==(EV_BREAK|EV_ERR) && !(pending&EV_CTS));check(L"error_mapping",m36_notify_errors(state.raw)==(CE_BREAK|CE_FRAME|CE_RXPARITY|CE_OVERRUN));
+ check(L"modem_status_error_bits_unknown",m36_modem_status(&state)==0);
+ packet[8]=0x0b;pending=0;m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending);check(L"modem_status_known",m36_modem_status(&state)==(MS_DSR_ON|MS_RLSD_ON|MS_RING_ON) && !(m36_modem_status(&state)&MS_CTS_ON));
+ packet[8]=0x74;pending=0;m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending);
  pending=0;m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending);check(L"break_not_repeated",!(pending&EV_BREAK) && (pending&EV_ERR));
  pending=0;packet[9]=1;check(L"invalid_notify_no_events",!m36_update_notify(&state,packet,10,1,GetTickCount(),0x1f9,&pending) && !pending);
 #ifdef COM_DIAG36

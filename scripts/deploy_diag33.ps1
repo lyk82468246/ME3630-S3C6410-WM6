@@ -1,10 +1,12 @@
-param([switch]$BuildOnly,[switch]$Version34,[switch]$Revision2,[switch]$Version35,[switch]$Version36,[switch]$Version37,[switch]$Version38,[switch]$Version39)
+param([switch]$BuildOnly,[switch]$Version34,[switch]$Revision2,[switch]$Version35,[switch]$Version36,[switch]$Version37,[switch]$Version38,[switch]$Version39,[switch]$Version40)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
 $cl='C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\ce\bin\x86_arm\cl.exe'
 $build=Join-Path $PSScriptRoot '..\build'
 $diag=if($Version34){34}else{33}
+$prior40=$Version40
+if($Version40){if($Version34 -or $Revision2 -or $Version35 -or $Version36 -or $Version37 -or $Version38 -or $Version39){throw 'Select Version40 alone'};$Version39=$true}
 if($Revision2){if(!$Version34){throw 'Revision2 requires Version34'};$diag='34R2'}
 if($Version39){if($Version34 -or $Revision2 -or $Version35 -or $Version36 -or $Version37 -or $Version38){throw 'Select Version39 alone'};$Version38=$true}
 if($Version38){if($Version34 -or $Revision2 -or $Version35 -or $Version36 -or $Version37){throw 'Select Version38 alone'};$Version37=$true}
@@ -15,6 +17,7 @@ if($Version36){$diag=36}
 if($Version37){$diag=37}
 if($Version38){$diag=38}
 if($Version39){$diag=39}
+if($prior40){$diag=40}
 $flags=@('/nologo','/TC','/O1','/GS-','/DUNICODE','/D_UNICODE','/DUNDER_CE','/D_WIN32_WCE=0x502','/DARM','/D_ARM_',"/I$sdk\Include\Armv4i")
 $driverFlags=$flags+@('/DSTREAM_V3','/DCOM_V4','/DCOM_DIAG33');for($n=5;$n -le 18;$n++){$driverFlags+="/DCOM_V$n"}
 if($Version34){$driverFlags+='/DCOM_DIAG34';$flags+='/DCOM_DIAG34'}
@@ -24,6 +27,7 @@ if($Version36){$driverFlags+='/DCOM_DIAG36';$flags+='/DCOM_DIAG36'}
 if($Version37){$driverFlags+='/DCOM_DIAG37';$flags+='/DCOM_DIAG37'}
 if($Version38){$driverFlags+='/DCOM_DIAG38';$flags+='/DCOM_DIAG38'}
 if($Version39){$driverFlags+='/DCOM_DIAG39';$flags+='/DCOM_DIAG39'}
+if($prior40){$driverFlags+='/DCOM_DIAG40';$flags+='/DCOM_DIAG40'}
 & $cl @driverFlags "/Fo$build\me3630_diag$diag.obj" "/Fe$build\ME3630ComV18D$diag.dll" "$PSScriptRoot\me3630_probe.c" /link /DLL /NODEFAULTLIB /ENTRY:DllMain /SUBSYSTEM:WINDOWSCE,5.02 "/DEF:$PSScriptRoot\me3630_com.def" "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'D33 driver build failed'}
 & $cl @flags "/Fo$build\install_diag$diag.obj" "/Fe$build\install_diag$diag.exe" "$PSScriptRoot\install_diag33.c" /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWSCE,5.02 "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
@@ -82,7 +86,7 @@ try {
    }
   }while(!$complete -and [DateTime]::UtcNow -lt $deadline)
   Write-Output $compat
-  $expectedChecks=if($Version36){33}else{26}
+  $expectedChecks=if($Version36){36}else{29}
   if(!$complete -or $compat -notmatch "COMPAT_UNIT CHECKS=$expectedChecks FAILURES=0 COMPLETE"){throw 'Compatibility test failed; no driver installed'}
  }
  if($Version37){

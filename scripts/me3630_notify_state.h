@@ -6,6 +6,11 @@ typedef struct {
 #define M36_NOTIFY_QUERY 0x00223ff8
 #define M36_NOTIFY_KNOWN (MS_DSR_ON|MS_RING_ON|MS_RLSD_ON)
 #define M36_LINE_EVENTS (EV_DSR|EV_RLSD|EV_RING)
+static DWORD m36_modem_status(const M36_NOTIFY_STATE *s)
+{
+    if(!s || !(s->known&M36_NOTIFY_KNOWN))return 0;
+    return s->status&M36_NOTIFY_KNOWN;
+}
 static BOOL m36_parse_notify(const BYTE *data,DWORD bytes,DWORD iface,PDWORD raw,PDWORD status)
 {
     DWORD signals,result=0;
