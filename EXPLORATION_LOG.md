@@ -1,5 +1,19 @@
 # 探索记录
 
+## 2026-10-12：整机 PPP 路线已进入 RAS，当前阻塞收敛为无线未注册
+
+用户要求目标是“整个 WM6 上网”，因此本轮优先验证系统级 PPP/RAS，而不是继续把应用级 socket 封装成虚拟网卡。WMDC 已恢复，使用 Joe 身份的 32 位 RAPI（`C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`）只读检查活动端口：本项目自己的 ME3630 COM1/COM5 仍由 `ME3630ComV18D39.dll` 提供，HCD1 为 S3C6410 OHCI；没有把 WMDC Function 侧 `rndisfn.dll` 或 LeadCore 调制解调器当作 ME3630 主机网络通道。
+
+使用的命令/工具与证据：
+
+- `scripts/run_rassaved.ps1 -ExpectedDiagnostic 39 -OutDir evidence/2026-10-12-ras-inspect`：`TAPI_INIT=0`，枚举到本项目 `ME3630 Test COM5`；保存条目“ME3630 电信”唯一匹配，设备名、`*99***2#`、PPP/IPv4 参数均正确。`TAPI_OPEN_MONITOR=0`；仅 `TAPI_PORTNAME` 查询返回 `0x80000048`，没有阻止 RAS 使用该端口。证据见 `evidence/2026-10-12-ras-inspect/inspect.txt`。
+- `scripts/run_rassaved.ps1 -Dial -ExpectedDiagnostic 39 -OutDir evidence/2026-10-12-ras-dial`：`PORT_DIAGNOSTIC build=39`、`PORT_VERIFIED version=18`、`DIAL_START error=0`，随后状态从 0/1/3 进入 8193，最终 `state_error=619`；程序只挂断自己的句柄，未修改保存条目。说明 TAPI/RAS 已经真正到达 ME3630 调制解调器，但会话未进入 PPP/数据连接。证据见 `evidence/2026-10-12-ras-dial/dial.txt`。
+- 扩展只读 `scripts/network_probe.c` 查询并运行 `scripts/run_networkprobe.ps1 -OutDir evidence/2026-10-12-radio-probe`：`CPIN READY`，但 `CSQ 99,99`、`CREG/CEREG 0,2`、`CGATT 0`、`ZPAS: "NO SERVICE"`，`^SYSINFO: 0,0,0,0,1`；当前 `ZSWITCH:x`、`ZADSET:n`，CID1/CID2 的 `ctnet` 均未激活。`ZCHIPTEMP:320,320,342` 也没有显示出明显过热。所有查询均为只读，没有改 APN、模式、IMEI、SIM 或复位。证据见 `evidence/2026-10-12-radio-probe/test.txt`。
+
+已验证结论：本轮 `619` 不是“没有 COM5”、不是“找不到 RAS 条目”、也不是当前驱动未注册到 TAPI；首要失败条件是 ME3630 尚未注册运营商网络。只要 `CREG/CEREG` 仍为 0,2、`CSQ` 仍为 99,99、`CGATT` 为 0，继续重写 COM/Unimodem 驱动不会产生 IP。下一次成功判据应先达到 `CREG/CEREG=1` 或 `5`、有数值 `CSQ`、`CGATT=1`，再复用同一个已保存 RAS 条目重试，并检查 WM6 是否获得 PPP 地址/默认路由。
+
+并行 NDIS/RNDIS 路线仍未选作当前主线：本机 Windows CE SDK/下载资料中只找到 `rndismini.h`，没有可直接部署的 CE 主机侧 `USB8023.DLL`/`RNDISMP.DLL` 及其库；`rndisfn.dll` 是 WMDC 设备功能侧组件。即使补齐主机协议驱动，也不能绕过当前 `NO SERVICE`。因此本轮没有切换 `x+r`/ECM/MBIM、没有重启 WM6、没有改变保存连接，也没有写入模块配置。
+
 ## 2026-10-12：评估用内部socket封装WM6虚拟网卡
 
 用户提出把ME3630应用级联网封装成虚拟网卡以获得系统级联网。核对Windows CE 5.0 NDIS `MiniportInitialize`文档：CE API层面支持初始化物理或虚拟网络适配器；NDIS intermediate driver可以向上暴露virtual adapter。结论是“可行但不是简单包装”：系统TCP/IP发给miniport的是IP/Ethernet包，而ME3630 `ZIPCALL`/`ZIPOPEN`提供的是已建立的TCP/UDP socket。若以内部socket为后端，必须再写内核态NDIS virtual miniport、用户态IPC/网关、流到socket的NAT/代理、返回包重封装、DNS/MTU/超时/校验和/断线清理；普通应用或`NDISUIO`不能直接创建完整系统网卡。
