@@ -1,5 +1,11 @@
 # 探索记录
 
+## 2026-10-12：第二个外挂供电扩展坞也未产生新的 ATTACH
+
+用户暂时没有直连转接板，改用第二个扩展坞并保持模块 `x+n`。等待15秒后以Joe的32位RAPI运行 `scripts/probe_active.ps1 -UsbState -OutDir evidence/2026-10-12-d40-powered-attach2`，仍为 `ACTIVE_ME3630_PORT_BLOCKS=0`；D40精确匹配仍在注册表中。随后重新运行 `scripts/collect_network_state.ps1`，累积D40日志的事件数仍为151，没有出现在第一只扩展坞测试之后的新 `19d2:1432 ATTACH`，末尾仍是上一轮的DETACH/USB错误序列。聚焦记录见 `evidence/2026-10-12-d40-powered-observation2/observation.txt`。
+
+因此第二只扩展坞也没有给WM6提供可测试的COM1/COM5端点，本轮不运行无线探针或RAS，避免把“没有USB枚举”误写成“拨号失败”。这不能证明第二只扩展坞的外挂电源无效，只能证明其下游数据枚举尚未在WM6 OHCI上成立；两个扩展坞都未改变前一轮的结论。下一次应使用转接板明确支持的外部输入，同时让USB数据直连WM6，或确认扩展坞/Hub与该老WM6 USB Host兼容并保留上游VBUS检测；不能把原始5V送入ME3630 V_MAIN。
+
 ## 2026-10-12：外挂5V扩展坞 A/B 尚未产生新的 USB 枚举
 
 用户将模块改接到支持外挂5V供电的扩展坞后，仍保持 `x+n`，未重启WM6、切模式、改SIM/APN或复位。以Joe的32位RAPI先等待15秒运行 `scripts/probe_active.ps1 -UsbState -OutDir evidence/2026-10-12-d40-powered-attach`：`ACTIVE_ME3630_PORT_BLOCKS=0`，精确匹配仍指向 `ME3630ComV18D40.dll`。随后约90秒内每10秒采样一次，共6次，全部为0；D40累积日志重新读取后ATTACH事件计数未增加，也没有观察到这个外挂供电时间段产生新的 `19d2:1432` ATTACH。结果见 `evidence/2026-10-12-d40-powered-observation/observation.txt`，完整注册表快照仍为本地/忽略证据。

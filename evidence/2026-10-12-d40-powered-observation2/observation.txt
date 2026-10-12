@@ -1,0 +1,22 @@
+ME3630 D40 second powered-dock observation
+Date: 2026-10-12 (Asia/Shanghai)
+
+The user replaced the externally powered dock/hub and kept the module in the
+WM6 x+n composition. No software mode change, WM6 reboot, SIM/APN change, or
+module reset was issued.
+
+After a 15 second settling wait, probe_active.ps1 -UsbState reported
+ACTIVE_ME3630_PORT_BLOCKS=0. The exact 19d2:1432 mapping still pointed to
+ME3630ComV18D40.dll. A fresh collect_network_state.ps1 pull showed the D40
+accumulated driver-log event count remained 151; no new ATTACH appeared after
+the previous observation and the last recorded events were still the earlier
+DETACH/USB error sequence.
+
+No radio probe or RAS attempt was started because this dock condition produced
+no new ME3630 USB attach and therefore no COM1/COM5 endpoint to test. This
+second dock does not prove its external supply is ineffective; it shows that
+WM6's OHCI host still did not establish a downstream ME3630 data enumeration.
+The next useful setup is a direct data path to the carrier/module with a
+carrier-supported external supply, or a hub explicitly known to work with this
+WM6 USB host and to preserve the required upstream VBUS detection. Do not feed
+raw 5 V to ME3630 V_MAIN.
