@@ -1,0 +1,37 @@
+ME3630 D40 powered-dock A/B observation
+Date: 2026-10-12 (Asia/Shanghai)
+
+Change under test
+-----------------
+The user moved the ME3630 connection through a dock/hub with external 5 V
+power. The module remained in the WM6 x+n composition. No mode change, WM6
+reboot, SIM change, APN write, or reset was issued by the test.
+
+Measurements
+------------
+- After a 15 second settling wait, scripts/probe_active.ps1 -UsbState reported
+  ACTIVE_ME3630_PORT_BLOCKS=0. The exact 19d2:1432 registry mapping still
+  selected ME3630ComV18D40.dll.
+- A second watch sampled the active registry six times at roughly ten-second
+  intervals (about 90 seconds including RAPI overhead); every sample reported
+  ACTIVE_ME3630_PORT_BLOCKS=0.
+- A fresh read of the accumulated D40 driver log showed the same event count
+  and no new ATTACH after the previous x+n observation. The prior attach,
+  COM1/COM5 activation, and subsequent detach evidence therefore cannot be
+  attributed to this powered-dock interval.
+- The current USB registry snapshot contains HCD1/S3C6410 OHCI and the
+  existing client mappings, but no Hub/USBHUB client mapping. This is an
+  indication only; the snapshot does not prove the dock's electrical VBUS
+  state or enumerate every failed USB descriptor transaction.
+
+Interpretation
+--------------
+This is not yet a valid proof that extra 5 V failed to improve the module's
+rail: the WM6 host did not produce a new ME3630 USB attach during the window.
+The leading possibilities are that the dock's upstream data path is not
+supported by this old WM6 USB host, the dock does not present the VBUS signal
+needed for host detection, or the module was not actually downstream-enumerated.
+The next controlled test should use a carrier-supported external input or a
+powered path whose USB data connection and required upstream VBUS are verified,
+without feeding raw 5 V into ME3630 V_MAIN. Once a fresh 19d2:1432 ATTACH is
+observed under that path, repeat the D40 radio probe and saved RAS test.

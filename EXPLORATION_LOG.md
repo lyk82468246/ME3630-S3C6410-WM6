@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-12：外挂5V扩展坞 A/B 尚未产生新的 USB 枚举
+
+用户将模块改接到支持外挂5V供电的扩展坞后，仍保持 `x+n`，未重启WM6、切模式、改SIM/APN或复位。以Joe的32位RAPI先等待15秒运行 `scripts/probe_active.ps1 -UsbState -OutDir evidence/2026-10-12-d40-powered-attach`：`ACTIVE_ME3630_PORT_BLOCKS=0`，精确匹配仍指向 `ME3630ComV18D40.dll`。随后约90秒内每10秒采样一次，共6次，全部为0；D40累积日志重新读取后ATTACH事件计数未增加，也没有观察到这个外挂供电时间段产生新的 `19d2:1432` ATTACH。结果见 `evidence/2026-10-12-d40-powered-observation/observation.txt`，完整注册表快照仍为本地/忽略证据。
+
+当前USB注册快照仍有HCD1/S3C6410 OHCI及原有LeadCore/WMDC客户端，但没有Hub/USBHUB客户端映射。这个结果不能证明扩展坞没有给下游供电，却说明“扩展坞已经让WM6看到ME3630”尚未成立；可能是老WM6 USB Host不支持该Hub数据路径、上游VBUS检测不满足，或模块没有在扩展坞下完成下游枚举。因此本轮没有运行无线探针或RAS：没有新COM端口，继续拨号不会增加信息量。
+
+下一步受控对照应使用转接板明确支持的外部输入，或确认扩展坞在上游仍提供WM6所需的USB数据/VBUS信号；若扩展坞只是供电Hub而WM6不支持Hub，应改用不经过Hub的数据连接并单独给转接板合规供电。仍不能把原始5V直接送入ME3630的3.0--4.0V V_MAIN。只有再次看到新的 `19d2:1432 ATTACH` 后，才重跑D40无线状态和保存RAS测试。
+
 ## 2026-10-12：D40 在 x+n 下能枚举并激活，但本轮 USB 链路无法保持
 
 用户将模块切回 WM6 使用的 `x+n`（19d2:1432）并重新插入。使用 Joe 的 32 位 WMDC/RAPI 会话运行 `scripts/probe_active.ps1 -UsbState`：初始快照和等待25秒后的重试均为 `ACTIVE_ME3630_PORT_BLOCKS=0`；随后约60秒、每5秒一次的12个采样也全部为0。注册表匹配仍明确指向 `ME3630ComV18D40.dll`，所以这些0只能表示采样时没有活动端口，不能单独证明模块从未枚举。
