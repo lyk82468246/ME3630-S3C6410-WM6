@@ -1,5 +1,15 @@
 # 探索记录
 
+## 2026-10-12：评估 WM6 USB 扩展坞驱动路线（当前设备未变更）
+
+用户询问能否开发 WM6 的 USB 扩展坞驱动，当前现象是通过 USB Host 接入扩展坞后下游设备不被识别。本轮只读检查仓库、SDK USB 头文件、`scripts/USB_PROTOTYPE.md`、`scripts/me3630_probe.c`、`scripts/probe_active.ps1`，并核对两次外挂供电扩展坞证据；没有安装驱动、重启 WM6、切换 ME3630 模式或改动供电。聚焦评估见 `evidence/2026-10-12-usb-dock-feasibility/assessment.txt`。
+
+当前设备测量保持为：WM6 CE 5.2 build 20782，S3C6410 `s3c6410_ohci2.dll` 活动为 `HCD1:`；两只外挂供电扩展坞观察均为 `ACTIVE_ME3630_PORT_BLOCKS=0`，D40 累积日志在第二只扩展坞窗口仍为151个事件，没有新的 `19d2:1432 ATTACH`。USB 注册快照有 HCD1、现有 HID/Mass Storage/LeadCore/ME3630 映射和 Function 侧 `rndisfn.dll`，没有 `USBHUB`/Hub client 映射；后者只是线索，不能单独证明 USBD 内部没有 Hub 支持。直连历史则已证明 USBD 能把 `19d2:1432` 交给本项目 client，并在 MI1/MI2 完成 AT 收发。
+
+核对 Microsoft CE `USBDeviceAttach`、`USB_FUNCS`、`HcdMdd_CreateHcdObject` 后，结论是：扩展坞支持若要实现，必须先解决 USBD/HCD 的标准 Hub 枚举，再分别加载下游 HID、Mass Storage、网络、串口等 class/client driver；不能靠现有 ME3630 COM DLL 让未枚举的下游设备出现。若当前镜像已有 Hub 支持，可能只需重建镜像/BSP 并补目标 class driver；若当前 BSP/USBD 没有或不稳定，就需要 Platform Builder/BSP 源码和 NK 重建，普通热部署 client DLL 不足。当前工作区没有完整 S3C6410 OS Design/BSP，因此暂不承诺仅靠 DLL 完成通用扩展坞支持。
+
+下一步最高价值动作：先采集扩展坞自身 VID/PID、USB class、speed、port count/descriptor；在 WM6 只接 Hub 本体时做 class 09 attach、Hub descriptor、port status/reset/change-status 的只读探针，再用单个低速/全速 HID 或 Mass Storage 做对照。只有确认下游产生独立 attach 后，才为具体设备补驱动。ME3630 仍应走直连数据链路并使用合规 3.0--4.0V `V_MAIN`，不能把扩展坞原始5V直接送入模块。
+
 ## 2026-10-12：第二个外挂供电扩展坞也未产生新的 ATTACH
 
 用户暂时没有直连转接板，改用第二个扩展坞并保持模块 `x+n`。等待15秒后以Joe的32位RAPI运行 `scripts/probe_active.ps1 -UsbState -OutDir evidence/2026-10-12-d40-powered-attach2`，仍为 `ACTIVE_ME3630_PORT_BLOCKS=0`；D40精确匹配仍在注册表中。随后重新运行 `scripts/collect_network_state.ps1`，累积D40日志的事件数仍为151，没有出现在第一只扩展坞测试之后的新 `19d2:1432 ATTACH`，末尾仍是上一轮的DETACH/USB错误序列。聚焦记录见 `evidence/2026-10-12-d40-powered-observation2/observation.txt`。

@@ -1,0 +1,45 @@
+WM6 USB 扩展坞驱动可行性评估
+日期：2026-10-12（Asia/Shanghai）
+
+问题
+----
+评估在当前 S3C6410/WM6 Host 上，是否可以让 USB Host 后面的扩展坞及其下游设备被识别；不要把现有 WMDC Function 侧 RNDIS 或 LeadCore 调制解调器当成该路径的证据。
+
+本次检查
+----------
+- 只读检查仓库文件、脚本、SDK 头文件和已有设备证据；未安装新驱动、未重启 WM6、未切换模块 USB 模式、未改变 SIM/APN/供电。
+- 使用 `rg` 搜索 USB/HCD/OHCI/Hub/USBHUB/USBD 相关源码、注册表记录和说明；阅读 `scripts/USB_PROTOTYPE.md`、`scripts/me3630_probe.c`、`scripts/probe_active.ps1`。
+- 核对 `evidence/2026-10-12-d40-powered-observation/observation.txt`、`evidence/2026-10-12-d40-powered-observation2/observation.txt` 及对应的 `usb-registry-local.txt`。
+- 核对 Microsoft CE USB 文档：`USBDeviceAttach`、`USB_FUNCS`、`HcdMdd_CreateHcdObject`。这些文档说明普通 Host client 是由 USBD 在设备附加时调用，并通过 USB_FUNCS 做控制/批量/中断传输；它们没有提供“由普通 client DLL 创建下游 USB 子设备树”的接口。
+
+当前设备证据
+------------
+- WM6 报告为 CE 5.2 build 20782；`Drivers\BuiltIn\OHCI` 的活动 Host 为 `HCD1:`，DLL 为 `s3c6410_ohci2.dll`。仓库中没有第二个 EHCI/高速 Host 的活动证据。
+- 两只外挂供电扩展坞的受控观察均为 `ACTIVE_ME3630_PORT_BLOCKS=0`；D40 累积日志在第二只扩展坞窗口仍为 151 个事件，没有新的 `19d2:1432 ATTACH`。因此这两个窗口都没有到达 ME3630 COM1/COM5 或设备功能驱动层。
+- 这两个窗口的 USB 注册快照有 HCD1、现有 Mass Storage/HID/LeadCore/ME3630 映射，以及 `USB\FunctionDrivers\RNDIS` 的 `rndisfn.dll`；没有 `USBHUB`/Hub client 映射。该缺失是线索，不足以单独证明 USBD 内部绝对没有 Hub 支持。
+- 直连历史证明另一条链路可进入 USBD：`USBDeviceAttach` 曾收到 `VID=19d2 PID=1432`，读取到 5 个接口；本项目原型在 MI1/MI2 上成功完成 AT 收发。这说明现有 `ME3630ComV18D40.dll` 的职责是“设备已枚举后的 client/stream 驱动”，不是 Hub/Host 控制器驱动。
+- 本仓库没有 Hub 类驱动源码，也没有可直接部署的 `USBHUB` 二进制；现有 `usbdi.h`/`usbtypes.h` 面向 USB client，并不构成 Hub 子设备枚举实现。
+
+结论
+----
+1. 原理上可以做，但“扩展坞驱动”不是继续扩展 ME3630 串口 DLL：必须先让 USBD/HCD 识别 Hub，再由 Hub 层枚举下游设备；之后每种下游功能还需要自己的 class/client driver。
+2. 如果当前 WM6 镜像的 USBD 已包含标准 Hub 枚举，只是缺少/未启用相关组件，那么工作量可能是重建镜像/BSP 并补齐下游 class driver；普通应用级 DLL 不能替代这一层。
+3. 如果当前 `s3c6410_ohci2.dll`/USBD 只稳定支持根端口设备，或 Hub 枚举在该 BSP 中缺失/有 bug，就需要取得 S3C6410 BSP/Platform Builder 源码，修改或替换 USB bus/HCD 集成并重建 NK。当前工作区没有这套完整 BSP/OS Design，因此暂时不能承诺仅靠热部署 DLL 解决。
+4. “扩展坞上的设备不识别”还可能是下游 class driver 缺失：当前镜像虽有 HID 和 Mass Storage，历史检查没有主机侧 `USB8023.dll`/`RNDISMP.dll`，也没有 ECM/MBIM 主机栈证据。即使 Hub 枚举成功，扩展坞 Ethernet/音频/视频/串口等功能也不会自动全部出现。
+
+建议的最小判别顺序
+--------------------
+1. 在 Win11 读取扩展坞自身的 VID/PID、USB class、speed、port count 和完整 descriptor；确认它是否是标准 USB 2.0 Hub，还是 USB-C/USB 3 dock 的复合设备。
+2. WM6 只连接“扩展坞本体”，不插下游设备，采集 HCD/USBD 的根端口 attach、Hub descriptor、class 09 控制请求和 port status/reset；再分别插入一个低速/全速 HID 或 Mass Storage 做单功能对照。
+3. 若能观察到 Hub attach 但没有子设备，优先修 Hub 的 port power/reset/change-status 和下游地址分配；若连 Hub attach 都没有，优先查 VBUS 检测、电气拓扑、OHCI/BSP，而不是 ME3630 client。
+4. 只有确认下游设备已经产生独立 attach 后，才为具体设备补驱动。ME3630 仍建议使用直连 USB data path，并用合规的 3.0--4.0V 模块电源；扩展坞外挂 5V 不能直接接 ME3630 `V_MAIN`。
+
+当前建议
+--------
+先做“标准 USB Hub 本体识别探针”和扩展坞 descriptor 采集，不先编写完整通用 Hub 驱动，也不继续改 ME3630 COM/RAS。若探针证实 WM6 能看到 class 09 Hub，再决定补镜像组件还是实现针对该 Hub 的 BSP 修复；若看不到，优先走直连或外置 USB 主控/桥接方案。
+
+资料
+----
+- Microsoft `USBDeviceAttach`：https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms923216%28v%3Dmsdn.10%29
+- Microsoft `USB_FUNCS`：https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms923262%28v%3Dmsdn.10%29
+- Microsoft `HcdMdd_CreateHcdObject`：https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms899363%28v%3Dmsdn.10%29
