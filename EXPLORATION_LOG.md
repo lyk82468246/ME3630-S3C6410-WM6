@@ -14,6 +14,14 @@
 
 并行 NDIS/RNDIS 路线仍未选作当前主线：本机 Windows CE SDK/下载资料中只找到 `rndismini.h`，没有可直接部署的 CE 主机侧 `USB8023.DLL`/`RNDISMP.DLL` 及其库；`rndisfn.dll` 是 WMDC 设备功能侧组件。即使补齐主机协议驱动，也不能绕过当前 `NO SERVICE`。因此本轮没有切换 `x+r`/ECM/MBIM、没有重启 WM6、没有改变保存连接，也没有写入模块配置。
 
+## 2026-10-12：运营商扫描被 SIM busy 阻断，补充 C1A 射频/供电前置条件
+
+为区分“无覆盖/频段不匹配”和“SIM/射频子系统尚未就绪”，扩展只读 `network_probe.c` 加入 `AT+ZBAND=?`、`AT+ZCDS?`、`AT+ZMONI?` 和 `AT+COPS=?`；普通查询预算仍为约2.2秒，运营商扫描预算为120秒，runner总等待上限为210秒。第一次扫描从tick1663509开始，第二次在等待30秒后从tick1717937开始；两次均能返回`AT`/`OK`和`AT+CFUN:1`，但`AT+CPIN?`返回`+CME ERROR: SIM busy`，之后`CSQ`、`COPS`、`CREG/CEREG`、`CGATT`、`ZBAND`、`ZMONI`、`ZCDS`等查询均为`ERROR`，`^SYSINFO`仍为`0,0,0,0,1`。`AT+COPS=?`没有返回运营商列表，不能据此断言现场无电信信号，也不能据此断言SIM损坏；当前更准确的结论是SIM/网络服务层在这两个采样点未就绪。聚焦证据见`evidence/2026-10-12-radio-scan/test.txt`和`evidence/2026-10-12-radio-scan-retry/test.txt`。
+
+联网核对官方硬件开发指南：`ME3630 C1A_MP0`列出的LTE FDD为B1/B3，LTE TDD为B38/B39/B40/B41，并列出CDMA BC0；C1A的LTE B1工作电流表为约550--600mA、B3约500--590mA，模块主电源要求3.0--4.0V且主机必须持续、安全供电。工信部公开的中国电信许可频率包含1700/1800MHz和1900/2100MHz等范围。由此只能推断C1A与中国电信在B1/B3存在频段重叠，不能推断当前地点一定有可用小区；是否能注册仍取决于实际部署频段、天线、SIM业务状态和供电。来源：GOSUNCN《Hardware Development Guide of ME3630 mini-PCIE module》 https://welinkjapan.co.jp/pdf/GOSUNCN%20Hardware%20Development%20Guide%20of%20ME3630%20mini-PCIE%20module_V1.5.pdf ，工信部频率统计 https://www.miit.gov.cn/jgsj/wgj/kpzs/art/2021/art_9105abf80949d49bd9065c1b6ebb06d2a.html 。
+
+下一步不需要先重写WM6驱动：应先确认转接板在模块端实际提供约3.0--4.0V，并能承受C1A发射/搜网时约600mA的瞬态与持续需求；确认主天线已接、SIM在手机中能注册中国电信，再保持模块上电等待`CPIN READY`后重跑只读探测。只有得到`CREG/CEREG=1/5`、数值`CSQ`和`CGATT=1`，才继续同一保存RAS条目的系统拨号；若这些条件成立而RAS仍失败，再回到PPP交接代码。
+
 ## 2026-10-12：评估用内部socket封装WM6虚拟网卡
 
 用户提出把ME3630应用级联网封装成虚拟网卡以获得系统级联网。核对Windows CE 5.0 NDIS `MiniportInitialize`文档：CE API层面支持初始化物理或虚拟网络适配器；NDIS intermediate driver可以向上暴露virtual adapter。结论是“可行但不是简单包装”：系统TCP/IP发给miniport的是IP/Ethernet包，而ME3630 `ZIPCALL`/`ZIPOPEN`提供的是已建立的TCP/UDP socket。若以内部socket为后端，必须再写内核态NDIS virtual miniport、用户态IPC/网关、流到socket的NAT/代理、返回包重封装、DNS/MTU/超时/校验和/断线清理；普通应用或`NDISUIO`不能直接创建完整系统网卡。

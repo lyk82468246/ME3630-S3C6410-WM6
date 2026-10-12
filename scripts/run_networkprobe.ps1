@@ -4,7 +4,7 @@ $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
 $cl='C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\ce\bin\x86_arm\cl.exe'
 $build=Join-Path $PSScriptRoot '..\build'
-$stem='network_probe';$deviceLog='\Temp\ME3630-network-probe.txt';$evidenceName='2026-10-11-network-probe';$expected=25;$extraFlags=@()
+$stem='network_probe';$deviceLog='\Temp\ME3630-network-probe.txt';$evidenceName='2026-10-12-network-probe';$expected=29;$extraFlags=@()
 & $cl /nologo /TC /O1 /GS- /DUNICODE /D_UNICODE /DUNDER_CE /D_WIN32_WCE=0x502 /DARM /D_ARM_ @extraFlags "/I$sdk\Include\Armv4i" "/Fo$build\$stem.obj" "/Fe$build\$stem.exe" "$PSScriptRoot\network_probe.c" /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWSCE,5.02 "/LIBPATH:$sdk\Lib\Armv4i" coredll.lib
 if($LASTEXITCODE -ne 0){throw 'Network probe build failed'}
 if($BuildOnly){return}
@@ -24,7 +24,7 @@ try {
  $exe='\Temp\ME3630-network-probe-'+[DateTime]::Now.ToString('HHmmss')+'.exe'
  [PositronDeviceRapi]::CopyFileToDevice("$build\$stem.exe",$exe)
  $remotePid=[PositronDeviceRapi]::LaunchProcess($exe,'\Temp',$null);Write-Output "TEST_PID=$remotePid"
- $deadline=[DateTime]::UtcNow.AddSeconds(75);$finished=$false
+ $deadline=[DateTime]::UtcNow.AddSeconds(210);$finished=$false
  do {
   Start-Sleep -Seconds 3
   if([PositronDeviceRapi]::TryCopyFileFromDevice($deviceLog,"$out\test.txt")) {

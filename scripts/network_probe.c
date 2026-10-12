@@ -19,11 +19,12 @@ static BOOL has(const BYTE *data,DWORD bytes,const char *word)
 }
 static BOOL query(HANDLE port,const char *cmd,DWORD generation)
 {
-    BYTE response[2048];WCHAR chunk[257];DWORD begin=GetTickCount(),count=0,n,written,i,j,len=0,error;BOOL ok;
+    BYTE response[2048];WCHAR chunk[257];DWORD begin=GetTickCount(),count=0,n,written,i,j,len=0,error,budget=2200;BOOL ok;
     while(cmd[len])len++;
+    if(len>=9 && cmd[0]=='A' && cmd[1]=='T' && cmd[2]=='+' && cmd[3]=='C' && cmd[4]=='O' && cmd[5]=='P' && cmd[6]=='S' && cmd[7]=='=' && cmd[8]=='?')budget=120000;
     emit(L"QUERY gen=%lu cmd=",generation);for(i=0;i<len;i++)chunk[i]=(WCHAR)cmd[i];chunk[len]=0;emit(L"%s\r\n",chunk);
     if(!WriteFile(port,cmd,len,&written,NULL) || written!=len){emit(L"WRITE_ERROR=%lu\r\n",GetLastError());return FALSE;}
-    while(count<sizeof(response) && GetTickCount()-begin<2200) {
+    while(count<sizeof(response) && GetTickCount()-begin<budget) {
         ok=ReadFile(port,response+count,sizeof(response)-count,&n,NULL);error=GetLastError();
         if(!ok){emit(L"READ_ERROR=%lu\r\n",error);return FALSE;}
         count+=n;if(has(response,count,"\r\nOK\r\n") || has(response,count,"ERROR"))break;
@@ -53,10 +54,10 @@ static void ras_devices(void)
 void mainCRTStartup(void)
 {
     HANDLE port=INVALID_HANDLE_VALUE;DWORD begin=GetTickCount(),version,actual,i,generation=0;BOOL completed=FALSE;COMMTIMEOUTS timeouts;
-    static const char *commands[]={"AT\r","AT+CFUN?\r","AT+CPIN?\r","AT+CSQ\r","AT+COPS?\r","AT+CREG?\r","AT+CEREG?\r","AT+CGATT?\r","AT+CGDCONT?\r","AT+CGACT?\r","AT+ZSWITCH?\r","AT+ZADSET?\r","AT+ZECMCALL?\r","AT+ZNVREAD=auto_dial_mode\r","AT+ZNVREAD=ecmcall_urc\r","AT+ZIPCFG?\r","AT+ZIPCALL?\r","AT+ZPAS?\r","AT+ZSNT?\r","AT^SYSINFO\r","AT+ZSNTE?\r","AT+ZBAND?\r","AT+ZARFCN?\r","AT+ZCELLINFO?\r","AT+ZCHIPTEMP?\r"};
+    static const char *commands[]={"AT\r","AT+CFUN?\r","AT+CPIN?\r","AT+CSQ\r","AT+COPS?\r","AT+CREG?\r","AT+CEREG?\r","AT+CGATT?\r","AT+CGDCONT?\r","AT+CGACT?\r","AT+ZSWITCH?\r","AT+ZADSET?\r","AT+ZECMCALL?\r","AT+ZNVREAD=auto_dial_mode\r","AT+ZNVREAD=ecmcall_urc\r","AT+ZIPCFG?\r","AT+ZIPCALL?\r","AT+ZPAS?\r","AT+ZSNT?\r","AT^SYSINFO\r","AT+ZSNTE?\r","AT+ZBAND?\r","AT+ZBAND=?\r","AT+ZARFCN?\r","AT+ZCDS?\r","AT+ZMONI?\r","AT+ZCELLINFO?\r","AT+ZCHIPTEMP?\r","AT+COPS=?\r"};
     logFile=CreateFile(L"\\Temp\\ME3630-network-probe.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
-    emit(L"NETWORK_PROBE start_tick=%lu read_only=1 duration=60s\r\n",begin);ras_devices();
-    while(GetTickCount()-begin<60000) {
+    emit(L"NETWORK_PROBE start_tick=%lu read_only=1 duration=180s\r\n",begin);ras_devices();
+    while(GetTickCount()-begin<180000) {
         port=CreateFile(L"COM1:",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
         if(port==INVALID_HANDLE_VALUE){Sleep(300);continue;}
         version=actual=0;
@@ -64,7 +65,7 @@ void mainCRTStartup(void)
         generation++;emit(L"OPEN gen=%lu instance=%lu tick=%lu\r\n",generation,version,GetTickCount());
         memset(&timeouts,0,sizeof(timeouts));timeouts.ReadIntervalTimeout=MAXDWORD;timeouts.ReadTotalTimeoutMultiplier=MAXDWORD;timeouts.ReadTotalTimeoutConstant=400;timeouts.WriteTotalTimeoutConstant=1000;
         if(SetCommTimeouts(port,&timeouts)) {
-            for(i=0;i<sizeof(commands)/sizeof(commands[0]) && GetTickCount()-begin<60000;i++)if(!query(port,commands[i],generation))break;
+            for(i=0;i<sizeof(commands)/sizeof(commands[0]) && GetTickCount()-begin<180000;i++)if(!query(port,commands[i],generation))break;
             completed=i==sizeof(commands)/sizeof(commands[0]);
         }
         CloseHandle(port);port=INVALID_HANDLE_VALUE;if(completed)break;Sleep(300);
