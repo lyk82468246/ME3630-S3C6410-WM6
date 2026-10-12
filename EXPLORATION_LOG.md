@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-12：继续尝试被PC端WMDC会话阻断，未重启或改WM6
+
+用户要求继续尝试，按Asia/Shanghai客户端日期新建evidence/2026-10-12-retry，先以Joe32位PowerShell运行probe_active -UsbState：CeRapiInitEx在30s内无就绪会话。本日没有读取到WM6注册表/模块端口状态，不把昨日Active0当今日实测。Windows只读Get-Service确认WcesComm和RapiMgr均Stopped；Get-PnpDevice -PresentOnly看到Microsoft Windows Mobile Remote Adapter状态OK，这仅是WMDC Function侧USB设备，不是ME3630已被WM6 Host枚举的证据，Bluetooth设备支持项亦无关。
+
+尝试仅Start-Service启动两项既有WMDC通信服务，均因当前权限不能打开服务而失败；未改启动类型/注册表、未停止其他服务，最终只读确认仍Stopped。用户回复暂时无法恢复WMDC。本轮无任何WM6进程启动/驱动安装/拨号/软重启/USB Host复位，昨日单次重启许可未沿用；当前ME3630、COM5、SIM状态未知，不能声称D39新实机测试通过或失败。
+
+离线补run_lifesnapshot.ps1及run_lifesupervise.ps1可选OutDir，默认行为保留，让恢复后的不同日期/轮次单独归档、不覆盖旧证据。test_rapi_snapshot主机假RAPI回归5/5零失败；两脚本AST无错误且OutDir参数存在，git diff检查通过；未重编译或变更安装中的D39。聚焦state-summary记录结果，完整本地清单依.gitignore保留。下一步前置条件是恢复WMDC/RAPI可访问；恢复后先核验实际枚举和D39身份，再采集拨号交接。本轮源码与记录按授权提交推送。
+
 ## 2026-10-11：D39补精确参数/载波诊断，修正RAPI失败读取破坏本地证据
 
 D39继承D38/D36，不改串口结果/所有权/取消/清理策略，追加IOCTL实际in/out长度、SetMask/Purge DWORD、DCB长度/波特率/flags/格式、超时字段及真实通知known/status/raw/age/事件。请求记录在元数据拒绝之前，仅读精确已知配置结构，不录串口载荷/密码/IMEI；线路组在已有锁内，CTS仍未知，GetCommModemStatus仍不支持。独立ME3630ComV18D39.dll/public18/private39及命名映射；SHA256 E632C4A9FA44A43B387118332C663BD72DE7978ACDAD820C1B730F73EE28C37D，见scripts/DIAG39.md，不声称兼容性/重枚举修复。

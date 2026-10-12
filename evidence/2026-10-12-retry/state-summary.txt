@@ -1,0 +1,14 @@
+2026-10-12 retry (client Asia/Shanghai date).
+Joe32 RAPI probe_active -UsbState did not connect:
+ CeRapiInitEx timed out after30s; WMDC session not ready.
+Windows present-only PnP: Microsoft Windows Mobile Remote Adapter statusOK.
+This is the WMDC function-side adapter, NOT proof of ME3630 Host enumeration.
+WcesComm and RapiMgr were both Stopped.
+Scoped Start-Service attempts failed: cannot open the services with current rights.
+Final read-only service query: both still Stopped; no service configuration changed.
+User says WMDC cannot currently be restored.
+No WM6 commands, installs, RAS attempts, resets or USB Host changes executed today.
+Current remote ME3630/COM5/SIM state is UNKNOWN; yesterday's port0 is history only.
+run_lifesnapshot and run_lifesupervise now accept OutDir to retain dated evidence.
+Host fake-RAPI snapshot tests5/5 pass; both script AST/OutDir checks pass.
+Prerequisite: restore WMDC/RAPI connection before any new live measurements.

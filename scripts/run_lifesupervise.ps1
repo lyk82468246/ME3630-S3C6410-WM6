@@ -1,4 +1,4 @@
-param([switch]$BuildOnly)
+param([switch]$BuildOnly,[string]$OutDir)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'
@@ -14,6 +14,7 @@ if(!$match.Success){throw 'RAPI helper missing'}
 Add-Type -TypeDefinition $match.Groups[1].Value
 . "$PSScriptRoot\rapi_snapshot.ps1"
 $out=Join-Path $PSScriptRoot '..\evidence\2026-10-11-diag39/supervised'
+if($OutDir){$out=[IO.Path]::GetFullPath($OutDir)}
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 try {
  [PositronDeviceRapi]::Connect();$prior=$null;$remote='\Temp\ME3630-supervise-d39.txt'
