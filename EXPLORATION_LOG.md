@@ -1,5 +1,13 @@
 # 探索记录
 
+## 2026-10-12：评估用内部socket封装WM6虚拟网卡
+
+用户提出把ME3630应用级联网封装成虚拟网卡以获得系统级联网。核对Windows CE 5.0 NDIS `MiniportInitialize`文档：CE API层面支持初始化物理或虚拟网络适配器；NDIS intermediate driver可以向上暴露virtual adapter。结论是“可行但不是简单包装”：系统TCP/IP发给miniport的是IP/Ethernet包，而ME3630 `ZIPCALL`/`ZIPOPEN`提供的是已建立的TCP/UDP socket。若以内部socket为后端，必须再写内核态NDIS virtual miniport、用户态IPC/网关、流到socket的NAT/代理、返回包重封装、DNS/MTU/超时/校验和/断线清理；普通应用或`NDISUIO`不能直接创建完整系统网卡。
+
+路线比较：`ZIPCALL`直连适合先验证应用级数据但不是系统级；`ZIPCALL`+虚拟miniport理论上能覆盖系统TCP/IP但工作量很高；让模块通过PPP/NDIS/RNDIS/ECM提供原始IP包，再接标准CE网络层，更符合系统模型，优先于socket虚拟网卡。当前没有开始写虚拟网卡、没有切模式、没有配置APN或拨号。建议先用已存在的COM1只读通路验证`ZIPCALL`，验证成功后再决定是否投入NDIS miniport；若目标只是系统上网，继续补真正的NDIS主机数据通道或PPP仍是更短路线。
+
+主资料：Windows CE 5.0 MiniportInitialize https://learn.microsoft.com/en-us/previous-versions/windows/embedded/aa447847%28v=msdn.10%29；Microsoft NDIS intermediate drivers https://learn.microsoft.com/en-us/windows-hardware/drivers/network/ndis-intermediate-drivers 。
+
 ## 2026-10-12：核验固件现成联网模式与自动拨号能力
 
 用户提出可能无需在WM6上把ME3630配置成复杂通用Modem，而直接利用固件网络模式。联网核对GOSUNCN ME3630 AT Command Reference Guide第12.8节和第10.2节，并检查本地原始WinCE6 `USBManager.reg`：固件定义了四类USB组合。`x+n`/PID 19d2:1432是Windows XP/7/Vista/WinCE NDIS（DIAG、AT、MODEM、NDIS、ADB）；`x+r`是RNDIS；`l+e`/PID 19d2:1476是Linux/Android ECM；`8`/PID 0602是MBIM。用户提供的WinCE6包对1432只注册AT/MODEM/DEBUG串口类，没有可用的ZTEUSBNDIS_CLASS项；这不能证明所有厂商版本都没有NDIS，但证明手头包不是现成的1432网络适配方案。WM6历史快照还未找到主机USB8023/RNDISMP，已有rndisfn.dll属于WMDC设备功能侧，不能当作主机RNDIS驱动。

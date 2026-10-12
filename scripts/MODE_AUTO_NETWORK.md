@@ -21,6 +21,26 @@ ME3630 固件不是只能提供一个“通用 Modem”串口。参考手册定�
 | `ZSWITCH=l`, `ZADSET=e` | `1476/1406` | Linux/Android ECM | Linux 已观测到 `cdc_ether`；WM6 未发现 CDC-ECM 主机驱动 |
 | `ZSWITCH=8` | `0602/1405` | Win8 MBIM | WM6 未发现 MBIM 主机栈；不作为当前路线 |
 
+## 把内部 socket 包装成虚拟网卡
+
+理论上可以在 CE 的 NDIS 层注册一个虚拟 miniport。CE 5 的 `MiniportInitialize` 文档明确包含“virtual network adapter”，NDIS intermediate driver 也可以向上暴露看起来像物理网卡的 virtual adapter。但这只解决“让系统 TCP/IP 栈看见一张网卡”，不解决 `ZIPCALL` 的数据语义。
+
+系统 TCP/IP 栈送给 miniport 的是 IP/Ethernet 包；`ZIPCALL`/`ZIPOPEN` 给应用的是 TCP/UDP socket。要连接两者，至少需要：
+
+- 一个 CE 内核态 NDIS virtual miniport，负责虚拟网卡的 OID、链路状态、发送/接收包和电源/卸载；
+- 一个与 miniport 通信的用户态网关，解析系统发来的 IP/TCP/UDP 流，为每个流建立模块 socket，并把返回数据重新封装成 IP/TCP/UDP 包；
+- NAT/端口映射、DNS、MTU、超时、重传、校验和、并发和断线清理。只做 socket 转发不能透明承载任意系统应用。
+
+因此它有三种实际效果：
+
+| 方案 | 系统范围 | 工作量 | 判断 |
+| --- | --- | --- | --- |
+| `ZIPCALL` 应用直连 | 否 | 低 | 最适合先验证模块内部数据能力 |
+| `ZIPCALL` + 虚拟 NDIS + 用户态 NAT/代理 | 理论上是 | 很高 | 可做，但不是“封装一下”；相当于再做一台小型 TCP/IP 网关 |
+| PPP/NDIS/RNDIS/ECM 提供原始 IP 包，再做 CE miniport/适配 | 是 | 中到高 | 更符合系统网络模型，优先于 socket 虚拟网卡 |
+
+特别是，`NDISUIO` 或现有 `NDIS.DLL` 只能提供/访问 NDIS 体系，不能凭一个普通应用直接创建完整网卡。若坚持虚拟网卡路线，建议先做一个不接模块的 CE 虚拟 miniport + 回环包测试，再接 `ZIPCALL`，不要一开始同时调无线、USB、NDIS 和 NAT。
+
 ## 2026-10-12 恢复 WMDC 后的实机只读结果
 
 证据：`evidence/2026-10-12-restored-wmdc/` 和 `evidence/2026-10-12-network-probe-restored/test.txt`。
@@ -36,3 +56,9 @@ ME3630 固件不是只能提供一个“通用 Modem”串口。参考手册定�
 
 - GOSUNCN ME3630 AT Command Reference Guide：
   https://welinkjapan.co.jp/pdf/GOSUNCN%20AT%20Command%20Reference%20Guide%20of%20Module%20Product%20ME3630.pdf
+
+- Windows CE 5.0 `MiniportInitialize`：
+  https://learn.microsoft.com/en-us/previous-versions/windows/embedded/aa447847%28v=msdn.10%29
+
+- Microsoft NDIS intermediate driver overview：
+  https://learn.microsoft.com/en-us/windows-hardware/drivers/network/ndis-intermediate-drivers
