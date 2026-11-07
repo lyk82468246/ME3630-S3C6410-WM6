@@ -1,0 +1,24 @@
+ME3630 USB mode switch: requested "mitm", interpreted as MBIM from context.
+
+Before:
+- ADB device serial: 3565a9, online; device shell uid=0(root).
+- /data/configs/usb/system = x
+- /data/configs/usb/mode = n
+- Firmware /sbin/usb/compositions/9025 maps 8+n to PID 0602 and functions diag,serial,usb_mbim,ffs.
+
+Actions:
+- Wrote one-byte value 8 to /data/configs/usb/system.
+- Kept /data/configs/usb/mode at n.
+- Ran sync, read back both values, and issued one `adb reboot` to apply.
+
+After:
+- ADB device serial 3565a9 returned online (transport_id=2).
+- Selectors read back as system=8, mode=n.
+- Windows Get-PnpDevice -PresentOnly reported USB\VID_19D2&PID_0602\3565A9, Status OK.
+- Interface MI_03: Generic Mobile Broadband Adapter, Class Net, Status OK.
+- Interface MI_05: Android Composite ADB Interface, Status OK.
+- Interfaces MI_00 through MI_02 remain unbound Android devices (Error); this does not negate successful MBIM adapter enumeration.
+
+Conclusion: MBIM USB composition is active and Windows recognizes its mobile broadband network adapter. No cellular data connection, IP assignment, or Internet request was tested.
+
+Commands/tools: `C:\Program Files (x86)\搞机助手\adb.exe` devices/shell cat/shell printf/shell sync/reboot; Windows PowerShell `Get-PnpDevice -PresentOnly` filtered to VID_19D2.

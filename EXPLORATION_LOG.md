@@ -1,5 +1,11 @@
 # 探索记录
 
+## 2026-11-07：按用户请求切换 ME3630 到 MBIM
+
+用户写“mitm”；结合ME3630实际支持模式，按MBIM理解并执行。使用`C:\Program Files (x86)\搞机助手\adb.exe`只读确认设备`3565a9`在线且设备端为root，`/data/configs/usb/system=x`、`mode=n`。复查设备内`/sbin/usb/compositions/9025`，确认`8+n`分支设置PID `0602`和`diag,serial,usb_mbim,ffs`。将system单字节改为`8`，mode保持`n`，执行`sync`并读回`8/n`，然后对ME3630执行一次`adb reboot`以应用组合。
+
+重枚举后ADB恢复（transport_id=2），设备端配置仍为`8/n`。Windows只读`Get-PnpDevice -PresentOnly`确认`USB\\VID_19D2&PID_0602\\3565A9`状态OK，MI_03 `Generic Mobile Broadband Adapter`（Net）状态OK，MI_05 ADB状态OK；MI_00至MI_02仍显示无驱动的Android项。这证明MBIM USB组合已生效且Windows网络适配器已识别，不证明蜂窝数据会话已连接或已取得IP/互联网。未发起连接、未改APN/SIM或其他网络设置。聚焦证据见`evidence/2026-11-07-mbim-switch/result.txt`。恢复原WinCE组合可将system设回`x`并保持mode=`n`，然后同步并重启模块。
+
 ## 2026-10-12：评估 WM6 USB 扩展坞驱动路线（当前设备未变更）
 
 用户询问能否开发 WM6 的 USB 扩展坞驱动，当前现象是通过 USB Host 接入扩展坞后下游设备不被识别。本轮只读检查仓库、SDK USB 头文件、`scripts/USB_PROTOTYPE.md`、`scripts/me3630_probe.c`、`scripts/probe_active.ps1`，并核对两次外挂供电扩展坞证据；没有安装驱动、重启 WM6、切换 ME3630 模式或改动供电。聚焦评估见 `evidence/2026-10-12-usb-dock-feasibility/assessment.txt`。
