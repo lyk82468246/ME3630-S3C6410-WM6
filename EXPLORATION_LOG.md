@@ -487,3 +487,14 @@ ARM ZTEUSBCOM.dll：SHA256 8742b34c4eecb9b7de5fd5279005294d7a26bccc4679dc773bb10
 完整证据：dependency-runtime.txt。诊断部署留下设备 Temp/ME3630-dependency-probe.exe 和同名 .txt；程序完成后退出。
 
 当前停止 AT/MODEM 测试的条件：没有已核验兼容 CE5 的 ZTE 驱动、没有已枚举的 ZTE COM 端口，且模块实际 Host 接线尚未确认。不能将 LeadCore 串口当成 ME3630 发送 AT。应先取得 CE5 ARM 包/源码，核验后安装，再连接模块进行串口检查。AT测试不需要有效 SIM。
+
+## 2026-11-16：Hub 支持结论、供电 A/B 计划与全设备观察探针
+
+只读核对了 BSP 树 `SMDK6410`（完整 WM6.1 源码，非仅文档）：`Src\Drivers\Usb\dirs` 仅含 `hcd`，`platform.bib` 只打包 `s3c6410_ohci2.dll`，全树无 USBHUB/usb8023/rndismp/ETH_USB_HOST。实机注册表 `Drivers\USB\ClientDrivers` 下仅有 ME3630Probe 与 LC6K_*，无 Hub client。结合网络资料（CE5/CE6 USBD 的 Hub 支持需镜像内置 hub client），判定**本机 USBD 不具备外部 Hub 枚举能力**——两只带外供扩展坞无新 ATTACH 的现象由此解释，"带供电 Hub 中转"路线在本机不可行。另确认 `HcdPdd_CheckConfigPower` 硬编码 500mA 限额（s3c6410_ohci.c:472），模组配置若申报 >500mA 会被 HCD 拒绝配置，与"枚举后数秒失联"相关，列为候选根因。
+
+新增（均未在实机部署）：
+- `scripts/me3630_watch.c/.def`、`install_watch.c`、`watch_usb.ps1`：全 USB_NO_INFO 匹配、accept=FALSE 的观察探针，逐设备记录设备/配置/接口/端点描述符到 `\Temp\ME3630-usb-watch.txt`，用于将来判定任意 Hub/设备是否被枚举。构建已通过（ME3630UsbWatch.dll + 安装/卸载器）；部署时 WMDC RAPI 30 秒未就绪（CeRapiInitEx 超时），按用户指示暂不部署。
+- `scripts/POWER_AB_TEST.md`：供电 A/B 对照手册。方案 A（首选）为断开载板 5V→LDO 路径、由可调电源 3.8V/限流 3A 直供 V_MAIN（与 WM6 共地；严禁 5V 直入、严禁双电源并联）；含每次测试的采集命令与通过标准（≥30 分钟无 DETACH、CSQ<99、CREG/CEREG∈{1,5}、CGATT=1 后再跑 ras_saved）。
+- BSP 侧 `USB_Host_RNDIS_Solution.md` 新增 13.4/13.5：路线变更说明（RNDIS 降备选）、Hub 结论、500mA 限额、供电实测与无线未注册现状、A/B 测试步骤。
+
+提交 588cfe9（探针+计划）与 3c87291（build/evidence 归档）已推送 origin/main。下一步待设备接上 WMDC 后：部署 watch 探针验证现有扩展坞是否被枚举（预期否），随后按 POWER_AB_TEST.md 方案 A 供电直供复测 ATTACH 稳定性与无线注册。
