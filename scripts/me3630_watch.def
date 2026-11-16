@@ -1,0 +1,5 @@
+LIBRARY ME3630UsbWatch
+EXPORTS
+    USBDeviceAttach
+    USBInstallDriver
+    USBUnInstallDriver
