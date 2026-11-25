@@ -1,5 +1,24 @@
 # 探索记录
 
+## 2026-11-25：Phase 0 离线盘点 CE 5.0 PB 与 SMDK6410 BSP（未触及实机）
+
+按已定路线规划（见 `scripts/ROADMAP.md`），本轮纯离线只读核查了本机 CE 5.0 Platform Builder（`C:\WINCE500`）与 `SMDK6410` WM6.1 BSP（`C:\Users\Joe\Downloads\SMDK6410_WM61_PS2ONDPPC_REL_0.02_080731`），未连接、未改动 WM6 实机或 ME3630 模块。详细代码依据与核查单见 `scripts/PHASE0_PB_BSP_AUDIT.md`。
+
+已验证的离线代码结论：
+
+1. **修正 2026-11-16 关于 Hub 与 500mA 的推断**：核对 `SMDK6410\Src\Drivers\Usb\Hcd\sources`、`s3c6410_ohci.c` 与 CE 5.0 `PUBLIC\COMMON\OAK\DRIVERS\USB\HCD\COMMON\cdevice.cpp`：
+   - CE 5.x 外部 Hub 支持由 `ohcdmdd2.lib` 内的 `CExternalHub` 直接提供（`s3c6410_ohci2.dll` 已链接 `ohcdmdd2.lib`），不存在独立的 `Drivers\USB\ClientDrivers\USBHUB` 项；此前以注册表缺少 `USBHUB` 推断“本机无 Hub 支持”需更正。另 `CExternalHub` 不调用客户端 `USBDeviceAttach`，因此 `ME3630UsbWatch` 只会看到下游 `CFunction` 设备，不会记录 `class=09(HUB)`。
+   - `cdevice.cpp:1624-1651` 显示，外部 Hub 若其配置描述符未声明 `SELF_POWERED`（`bmAttributes & 0x40`），会直接拒绝任何 `MaxPower*2 > 100mA` 的下游设备（输出 `!USB warning: cannot attach high-power device to a bus-powered hub` 并终止配置），这高度吻合此前两只外挂供电扩展坞未触发 ME3630 `ATTACH` 的现象。
+   - `HcdPdd_CheckConfigPower` 500mA 限额只在直连 Root Hub 的 `SetConfiguration` 之前检查一次（500mA 即 `MaxPower=250` 允许通过）；历史直连已多次进入 `USBDeviceAttach`/`V18 READY`，因此 500mA 检查不是“直连激活后数秒失联”的根因。
+2. **离线链接 CE 5.0 ARMv4I 主机 RNDIS 驱动并完成静态导入审计**：
+   - 使用 `scripts/build_rndis_ce5.ps1` 从 `C:\WINCE500\PUBLIC\COMMON\OAK\LIB\ARMV4I\RETAIL` 零错误链接生成本地 `build/rndismp.dll` 与 `build/usb8023.dll`（按许可与 `.gitignore` 保留本地，不入库）；PE 导入/导出快照保存至 `evidence/2026-11-25-phase0-pb-bsp/rndis-pe.json`。
+   - 两 DLL 的 `NDIS.dll`（37 项）、`CXPORT.dll`（2 项）、`USBD.dll`（4 项）均为按名导入且目标 DLL 已在实机 `windows-files.json` 中确认存在；`COREDLL.dll` 共 37 个序号（最高 `#1487`），其中 30 个已在 2026-10-11 实机确认存在，其余 7 个为 CE5 核心内存/权限函数（`#524/#525/#560/#611/#612/#1486/#1487`）。
+   - 核对 `common.reg:2247-2277` 确认 `Comm\USB8023` 与 `USB80231` 的 `ImagePath` 应为 `USB8023.DLL`；同时反汇编 `usb8023.lib` 发现其 `USBDeviceAttach` 硬性要求 `lpDriverSettings->dwDeviceClass == 2` 以及 `0x02/0x02/0xFF` + `0x0A/0x00/0x00` 接口。若 ME3630 `x+r` 为复合设备或使用 `0xE0/0x01/0x03`，需在实测抓包后再补轻量级封装适配。
+3. **定位 Unimodem `hDevice_r0` 触发 `RAS 619` 的代码缺口**：
+   - 核对 `PRIVATE\WINCEOS\COMM\TAPI\UNIMODEM\modem.c:726-778` 与 `COM_MDD2\mdd.c:2134-2152`：`WatchForDisconnect` 通过零访问句柄 `hDevice_r0` 调用 `SetCommMask(EV_RLSD)`、`WaitCommEvent`、`GetCommModemStatus`，调用失败即立刻挂断（`DoDevlineDrop`）。本项目 D34–D40 的 `scripts/me3630_open.inc` 拒绝了零访问句柄的这 3 个 IOCTL（返回 `ERROR_ACCESS_DENIED=5`），与 D38 首轮 `619` 日志吻合，列为路线 2B（D41）明确修复项。
+
+本轮新增并离线编译验证了只读实机依赖/加载探针（`scripts/rndis_dep_probe.c` → `build/rndis_dep_probe.exe`、`scripts/run_rndis_dep_probe.ps1`）及可逆部署工具（`scripts/install_rndis.c` → `build/install_rndis.exe`/`uninstall_rndis.exe`、`scripts/deploy_rndis.ps1`），所有新增脚本均通过 PowerShell AST 语法检查。待实机恢复 WMDC 并完成方案 A 3.8V 独立供电后，按 `scripts/ROADMAP.md` 执行 Phase 1 实测与依赖验证。
+
 ## 2026-11-07：按用户请求切换 ME3630 到 MBIM
 
 用户写“mitm”；结合ME3630实际支持模式，按MBIM理解并执行。使用`C:\Program Files (x86)\搞机助手\adb.exe`只读确认设备`3565a9`在线且设备端为root，`/data/configs/usb/system=x`、`mode=n`。复查设备内`/sbin/usb/compositions/9025`，确认`8+n`分支设置PID `0602`和`diag,serial,usb_mbim,ffs`。将system单字节改为`8`，mode保持`n`，执行`sync`并读回`8/n`，然后对ME3630执行一次`adb reboot`以应用组合。

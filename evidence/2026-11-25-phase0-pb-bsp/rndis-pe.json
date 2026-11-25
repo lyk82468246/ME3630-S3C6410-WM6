@@ -1,0 +1,175 @@
+﻿[
+  {
+    "path": "C:\\Users\\Joe\\Documents\\ME3630-S3C6410-WM6\\scripts\\..\\build\\rndismp.dll",
+    "sha256": "294a9e6980a1a9bbaaf47ba766265ef47e08829133658032d0ae12cb80ab4daa",
+    "machine": "0x1c2",
+    "os_version": [
+      5,
+      0
+    ],
+    "subsystem": 9,
+    "subsystem_version": [
+      5,
+      0
+    ],
+    "imports": {
+      "NDIS.dll": [
+        "NdisInterlockedDecrement",
+        "NdisQueryPacket",
+        "NdisFreePacket",
+        "NdisAllocatePacketPoolEx",
+        "NdisAllocateBuffer",
+        "NdisAllocatePacket",
+        "NdisAllocateBufferPool",
+        "NdisFreePacketPool",
+        "NdisFreeBufferPool",
+        "NdisAllocateFromNPagedLookasideList",
+        "NdisInitializeWrapper",
+        "NdisMRegisterMiniport",
+        "NdisMRegisterUnloadHandler",
+        "NdisTerminateWrapper",
+        "NdisMInitializeTimer",
+        "NdisMGetDeviceProperty",
+        "NdisMSetAttributesEx",
+        "NdisMRegisterAdapterShutdownHandler",
+        "NdisMSleep",
+        "NdisMCancelTimer",
+        "NdisOpenConfiguration",
+        "NdisReadNetworkAddress",
+        "NdisInitializeEvent",
+        "NdisWaitEvent",
+        "NdisFreeEvent",
+        "NdisCloseConfiguration",
+        "NdisSetEvent",
+        "NdisGetSystemUpTime",
+        "NdisSetTimer",
+        "NdisInterlockedIncrement",
+        "NdisFreeSpinLock",
+        "NdisAllocateSpinLock",
+        "NdisAcquireSpinLock",
+        "NdisFreeBuffer",
+        "NdisReleaseSpinLock"
+      ],
+      "CXPORT.dll": [
+        "CTEAllocMem",
+        "CTEFreeMem"
+      ],
+      "COREDLL.dll": [
+        "#612",
+        "#611",
+        "#3",
+        "#36",
+        "#33",
+        "#496",
+        "#1044",
+        "#1047",
+        "#525",
+        "#11",
+        "#524",
+        "#10",
+        "#2",
+        "#495",
+        "#492",
+        "#4",
+        "#5",
+        "#497",
+        "#6",
+        "#1232",
+        "#553",
+        "#494"
+      ]
+    },
+    "exports": {
+      "DllUnload": 1,
+      "DriverEntry": 2,
+      "ExAllocatePool": 3,
+      "ExAllocatePoolWithTag": 4,
+      "ExFreePool": 5,
+      "ExQueueWorkItem": 6,
+      "RndisMIndicateReceive": 7,
+      "RndisMInitializeWrapper": 8,
+      "RndisMSendComplete": 9
+    }
+  },
+  {
+    "path": "C:\\Users\\Joe\\Documents\\ME3630-S3C6410-WM6\\scripts\\..\\build\\usb8023.dll",
+    "sha256": "e8822df9ef6aef1045f99e62e4243d8488846d0badda7a81de08ad6ad4f7f3d2",
+    "machine": "0x1c2",
+    "os_version": [
+      5,
+      0
+    ],
+    "subsystem": 9,
+    "subsystem_version": [
+      5,
+      0
+    ],
+    "imports": {
+      "NDIS.dll": [
+        "NdisRegisterAdapter",
+        "NdisDeregisterAdapter"
+      ],
+      "USBD.dll": [
+        "RegisterClientSettings",
+        "RegisterClientDriverID",
+        "UnRegisterClientDriverID",
+        "UnRegisterClientSettings"
+      ],
+      "rndismp.dll": [
+        "ExAllocatePoolWithTag",
+        "ExFreePool",
+        "RndisMSendComplete",
+        "RndisMInitializeWrapper",
+        "RndisMIndicateReceive",
+        "DllUnload"
+      ],
+      "COREDLL.dll": [
+        "#496",
+        "#524",
+        "#560",
+        "#63",
+        "#456",
+        "#464",
+        "#517",
+        "#1046",
+        "#525",
+        "#461",
+        "#463",
+        "#455",
+        "#1486",
+        "#494",
+        "#553",
+        "#3",
+        "#1232",
+        "#2",
+        "#5",
+        "#4",
+        "#497",
+        "#87",
+        "#1047",
+        "#1044",
+        "#6",
+        "#33",
+        "#495",
+        "#36",
+        "#11",
+        "#498",
+        "#516",
+        "#492",
+        "#1097",
+        "#10",
+        "#1487"
+      ],
+      "CXPORT.dll": [
+        "CTEFreeMem",
+        "CTEAllocMem"
+      ]
+    },
+    "exports": {
+      "DriverEntry": 1,
+      "USBDeviceAttach": 2,
+      "USBInstallDriver": 3,
+      "USBUnInstallDriver": 4
+    }
+  }
+]
