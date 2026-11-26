@@ -41,6 +41,9 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
    p->lastRxTick=GetTickCount();
 #endif
    p->eventPending|=p->eventMask&EV_RXCHAR;SetEvent(p->rxReady);
+#ifdef COM_DIAG41
+   m36_broadcast_events(p,EV_RXCHAR);
+#endif
 #ifdef COM_V10
    logline(L"Q_PUSH port=%lu tid=%lu ptr=%08lx bytes=%lu queued=%lu\r\n",p->index,GetCurrentThreadId(),(DWORD)p,bytes,p->qCount);
 #endif
@@ -53,7 +56,11 @@ static DWORD WINAPI serial_rx_pump(LPVOID context)
   }
  }
  if(!error)error=ERROR_DEVICE_NOT_CONNECTED;
- EnterCriticalSection(&p->io);p->rxFailure=error;SetEvent(p->rxReady);SetEvent(p->eventWake);LeaveCriticalSection(&p->io);
+ EnterCriticalSection(&p->io);p->rxFailure=error;SetEvent(p->rxReady);SetEvent(p->eventWake);
+#ifdef COM_DIAG41
+ m36_wake_all_opens(p);
+#endif
+ LeaveCriticalSection(&p->io);
  logline(L"V9 RX_EXIT interface=%lu error=%lu\r\n",p->index,error);
 #ifdef COM_DIAG37
  LIFE(M37_RX_EXIT,p,p->index,error);

@@ -1,0 +1,18 @@
+﻿CHECK ownership_data_plus_two_r0                 pass=1
+CHECK r0_allows_get_set_wait_modemstatus         pass=1
+CHECK r0_denies_mutating_ioctls                  pass=1
+CHECK close_second_r0_preserves_data_and_r0      pass=1
+CHECK independent_masks_set                      pass=1
+CHECK both_waiters_blocked_concurrently          pass=1
+CHECK same_handle_second_waiter_busy             pass=1
+CHECK rxchar_wakes_data_not_r0                   pass=1
+CHECK purge_rxclear_clears_open_pending          pass=1
+CHECK purge_does_not_drop_r0_waiter              pass=1
+CHECK baseline_notify_no_spurious_r0_wake        pass=1
+CHECK rlsd_drop_wakes_r0_and_status_low          pass=1
+CHECK setmask_zero_on_r0_preserves_data_mask     pass=1
+CHECK setmask_zero_returns_mask0_ok              pass=1
+CHECK close_r0_wakes_blocked_waiter_safely       pass=1
+CHECK usb_detach_fails_waiter_disconnected       pass=1
+CHECK final_refs_and_openlist_clean              pass=1
+D41_HOST_TEST CHECKS=17 FAILURES=0 COMPLETE

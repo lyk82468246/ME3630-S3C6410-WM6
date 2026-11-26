@@ -55,7 +55,7 @@ void mainCRTStartup(void)
 {
  RASENTRYNAME *names;RASENTRY *entry;RASDIALPARAMS params;RASCONNSTATUS status;RASPPPIP ip;
  DWORD bytes,count=0,error,i,entryBytes,configBytes,start=GetTickCount(),matches=0,actual,version;
- BYTE config[4096];WCHAR selected[RAS_MaxEntryName+1];BOOL dial=wcsstr(GetCommandLineW(),L"--dial")!=NULL,connected=FALSE;DWORD expected=wcsstr(GetCommandLineW(),L"--require-d39")?39:(wcsstr(GetCommandLineW(),L"--require-d38")?38:0);
+ BYTE config[4096];WCHAR selected[RAS_MaxEntryName+1];BOOL dial=wcsstr(GetCommandLineW(),L"--dial")!=NULL,connected=FALSE;DWORD expected=wcsstr(GetCommandLineW(),L"--require-d41")?41:(wcsstr(GetCommandLineW(),L"--require-d40")?40:(wcsstr(GetCommandLineW(),L"--require-d39")?39:(wcsstr(GetCommandLineW(),L"--require-d38")?38:0)));
  HRASCONN connection=NULL;HANDLE port;HWND window=NULL;WNDCLASS wc;MSG msg;
  logFile=CreateFile(L"\\Temp\\ME3630-ras-saved.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
  emit(L"SAVED_START tick=%lu dial=%lu\r\n",start,dial);

@@ -6,6 +6,7 @@
 /build/*.lib
 /build/*.exp
 /build/ce5_rndis_tmp/
+/build/host_test_local/
 /build/rndismp.dll
 /build/usb8023.dll
 /build/snapshot-unit-local/

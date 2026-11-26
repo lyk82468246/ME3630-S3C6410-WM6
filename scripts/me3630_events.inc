@@ -60,6 +60,39 @@ static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
  InterlockedExchange(&port->eventWaiter,0);port_release(port);
  SetLastError(error);return ok;
 }
+#ifdef COM_DIAG41
+static BOOL serial_wait_event_open_impl(M36_OPEN *open,PBYTE out,DWORD outSize,PDWORD actual)
+{
+ PORT *port=open->port;DWORD epoch,mask=0,error=0;BOOL ok=FALSE,done;
+ if(!out || outSize<sizeof(DWORD)){SetLastError(ERROR_INVALID_PARAMETER);return FALSE;}
+ memset(out,0,sizeof(DWORD));
+ if(InterlockedCompareExchange(&open->eventWaiter,1,0)!=0){SetLastError(ERROR_BUSY);return FALSE;}
+ InterlockedIncrement(&open->refs);
+ EnterCriticalSection(&port->io);epoch=open->eventEpoch;LeaveCriticalSection(&port->io);
+ for(;;) {
+  EnterCriticalSection(&port->io);done=FALSE;
+  if(!serial_alive(port)){error=ERROR_DEVICE_NOT_CONNECTED;done=TRUE;}
+  else if(epoch!=open->eventEpoch || !open->eventMask || open->closing){ok=TRUE;done=TRUE;}
+  else if((open->eventMask&EV_RXCHAR) && port->rxFailure){error=port->rxFailure;done=TRUE;}
+  else if((open->eventMask&M36_LINE_EVENTS) && port->notifyState.error){error=port->notifyState.error;done=TRUE;}
+  else if(open->eventPending&open->eventMask){mask=open->eventPending&open->eventMask;open->eventPending&=~mask;ok=TRUE;done=TRUE;}
+  if(!done)ResetEvent(open->eventWake);
+  LeaveCriticalSection(&port->io);
+  if(done)break;
+  WaitForSingleObject(open->eventWake,20);
+ }
+ memcpy(out,&mask,sizeof(mask));if(ok && actual)*actual=sizeof(mask);
+ InterlockedExchange(&open->eventWaiter,0);m36_open_deref(open);
+ SetLastError(error);return ok;
+}
+static BOOL serial_wait_event_open(M36_OPEN *open,PBYTE out,DWORD outSize,PDWORD actual)
+{
+ BOOL result;DWORD error,mask=0;LIFE(M38_WAIT_BEGIN,open,0,0);
+ result=serial_wait_event_open_impl(open,out,outSize,actual);error=GetLastError();
+ if(result){memcpy(&mask,out,4);LIFE(M38_WAIT_MASK,open,mask,0);}
+ LIFE(M38_WAIT_END,open,result,error);return result;
+}
+#endif
 #ifdef COM_DIAG38
 static BOOL serial_wait_event(PORT *port,PBYTE out,DWORD outSize,PDWORD actual)
 {

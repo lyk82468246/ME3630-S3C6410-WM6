@@ -1,5 +1,18 @@
 # 探索记录
 
+## 2026-11-26：离线完成路线 2B（D41 `hDevice_r0` 修复）、主机多线程单测与 USBD 卸载契约核查
+
+继续纯离线推进（未连接/未改动 WM6 实机与 ME3630），详见 `scripts/DIAG41.md`：
+
+1. **实现并编译 `ME3630ComV18D41.dll`（路线 2B 备选就绪）**：
+   - 对照 CE 5.0 `UNIMODEM\modem.c:726-778` 与 `COM_MDD2\mdd.c:2134-2152`，在 `COM_DIAG41` 分支下为每个 `M36_OPEN` 独立维护 `eventMask`/`eventPending`/`eventEpoch`/`eventWaiter`/`eventWake`/`refs` 并挂入 `PORT.openList`；放行零访问句柄（`hDevice_r0`）的 `Get/SetCommMask`、`WaitCommEvent`、`GetCommModemStatus`，仍拒绝读写与 `SetCommState`/`SetCommTimeouts`/`PurgeComm`/`EscapeCommFunction`；RX/CDC 通知按各自订阅掩码扇出，避免 `WatchForDisconnect` 刚进入连接即报拒绝 5 挂断（`619`）。
+   - 同时修复 `me3630_stream.inc` 中此前 D40 激活串口仍指向 `ME3630ComV18D39.dll` 的遗漏；D41 使用独立文件名 `ME3630ComV18D41.dll`、诊断版本 `41` 与映射 `ME3630D41Lifecycle`，并同步更新 `ras_saved.c`、`run_rassaved.ps1`、`life_capture.c`、`run_life.ps1` 与 `deploy_diag33.ps1`。
+2. **离线验证**：
+   - 新增主机原生多线程回归测试 `scripts/test_d41_host.c` / `scripts/run_d41_host_test.ps1`（直接编译生产 `me3630_open.inc` 等头文件），**17/17 通过、0 失败**（证据 `evidence/2026-11-26-diag41-offline/host-unit.txt`）；`test_rapi_snapshot.ps1` 5/5 通过。
+   - ARMv4I 交叉编译 D33、D40（回归）、D41、`ras_saved.exe`、`life_capture_d41.exe`、`life_unit_d41.exe`、`open_unit.exe`（19 项）、`compat_unit.exe`（43 项）均零错误，所有脚本通过 AST 检查。当前仅为离线验证，尚未在 WM6 实机部署或拨号。
+3. **补充核查 CE 5.0 `USBD` 卸载契约**：
+   - 核对 `C:\WINCE500\PUBLIC\COMMON\OAK\DRIVERS\USB\USBD\usbddrv.cpp:376-449` 确认：`HcdDeviceDetached` 在回调 `USB_CLOSE_DEVICE` 前已关闭所有管道（解释 D37/D38 全部 18 次 `lpClosePipe` 返回 `FALSE/error=6` 属正常现象），且在回调返回后立即 `FreeLibrary` 客户端 DLL 并释放 `SDevice`，印证同步等待工作线程退出的必要性。
+
 ## 2026-11-25：Phase 0 离线盘点 CE 5.0 PB 与 SMDK6410 BSP（未触及实机）
 
 按已定路线规划（见 `scripts/ROADMAP.md`），本轮纯离线只读核查了本机 CE 5.0 Platform Builder（`C:\WINCE500`）与 `SMDK6410` WM6.1 BSP（`C:\Users\Joe\Downloads\SMDK6410_WM61_PS2ONDPPC_REL_0.02_080731`），未连接、未改动 WM6 实机或 ME3630 模块。详细代码依据与核查单见 `scripts/PHASE0_PB_BSP_AUDIT.md`。

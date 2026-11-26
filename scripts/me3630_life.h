@@ -1,7 +1,9 @@
 /* CE5 named, page-backed flight recorder. No waits/file I/O in record(). */
 #define M37_CAP 256
 #define M37_MAGIC 0x37334d36
-#ifdef COM_DIAG39
+#ifdef COM_DIAG41
+#define M37_NAME L"ME3630D41Lifecycle"
+#elif defined(COM_DIAG39)
 #define M37_NAME L"ME3630D39Lifecycle"
 #elif defined(COM_DIAG38)
 #define M37_NAME L"ME3630D38Lifecycle"

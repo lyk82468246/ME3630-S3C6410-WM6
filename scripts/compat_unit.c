@@ -4,6 +4,9 @@
 #include "me3630_notify_state.h"
 #undef wsprintfW
 typedef struct {HANDLE stop;} PROBE;
+#ifdef COM_DIAG41
+struct M36_OPEN_TAG;
+#endif
 typedef struct {
  PROBE *parent;HANDLE in,out,rxReady,eventWake;CRITICAL_SECTION io,rxIO;
  COMMTIMEOUTS timeouts;DWORD index,qHead,qCount,rxFailure,eventMask,eventPending;
@@ -11,12 +14,18 @@ typedef struct {
 #ifdef COM_DIAG36
  DWORD eventEpoch;LONG refs,eventWaiter;M36_NOTIFY_STATE notifyState;
 #endif
+#ifdef COM_DIAG41
+ LONG opened;struct M36_OPEN_TAG *openList;
+#endif
 } PORT;
 static BOOL serial_alive(PORT *p){return WaitForSingleObject(p->parent->stop,0)!=WAIT_OBJECT_0;}
-static void port_release(PORT *p){}
+static void port_release(PORT *p){InterlockedDecrement(&p->refs);}
 static void logline(LPCWSTR format,...){}
 #define LIFE(event,object,value,error) ((void)0)
 static int serial_transfer(PORT *p,HANDLE pipe,LPVOID buf,DWORD size,BOOL input,DWORD timeout,PDWORD bytes){*bytes=0;return 0;}
+#ifdef COM_DIAG41
+#include "me3630_open.inc"
+#endif
 #include "me3630_ring.inc"
 #include "me3630_queue.inc"
 #include "me3630_purge.inc"
@@ -32,6 +41,10 @@ typedef struct {PORT *p;HANDLE ready;DWORD result,error;} JOB;
 static DWORD WINAPI blocked(LPVOID arg){JOB *j=(JOB*)arg;BYTE buf[16];SetEvent(j->ready);j->result=serial_queue_read(j->p,buf,16);j->error=GetLastError();return 0;}
 #ifdef COM_DIAG36
 static DWORD WINAPI event_blocked(LPVOID arg){JOB *j=(JOB*)arg;DWORD mask=99,actual=0;j->result=serial_wait_event(j->p,(PBYTE)&mask,4,&actual);j->error=GetLastError();SetEvent(j->ready);return 0;}
+#endif
+#ifdef COM_DIAG41
+typedef struct {M36_OPEN *o;HANDLE ready;DWORD mask,result,error;} OPEN_JOB;
+static DWORD WINAPI open_event_blocked(LPVOID arg){OPEN_JOB *j=(OPEN_JOB*)arg;DWORD actual=0;j->mask=99;j->result=serial_wait_event_open(j->o,(PBYTE)&j->mask,4,&actual);j->error=GetLastError();SetEvent(j->ready);return 0;}
 #endif
 void mainCRTStartup(void)
 {
@@ -76,6 +89,44 @@ void mainCRTStartup(void)
  memset(&job,0,sizeof(job));job.p=&p;job.ready=CreateEvent(NULL,TRUE,FALSE,NULL);thread=CreateThread(NULL,0,event_blocked,&job,0,NULL);
  begin=GetTickCount();while(!p.eventWaiter && GetTickCount()-begin<500)Sleep(1);Sleep(30);m36_set_event_mask(&p,EV_RXCHAR);n=WaitForSingleObject(thread,1000);
  check(L"same_mask_cancels_wait",thread && n==WAIT_OBJECT_0 && job.result && !job.error && !p.eventPending);if(thread)CloseHandle(thread);CloseHandle(job.ready);
+#endif
+#ifdef COM_DIAG41
+ {
+  M36_OPEN *dataOpen,*r0Open;OPEN_JOB jData,jR0;HANDLE tData,tR0;DWORD fired=0;
+  p.refs=1;p.rxFailure=0;memset(&p.notifyState,0,sizeof(p.notifyState));p.notifyState.size=sizeof(p.notifyState);
+  dataOpen=m36_open_new(&p,GENERIC_READ|GENERIC_WRITE);r0Open=m36_open_new(&p,0);
+  check(L"d41_dual_open",dataOpen && r0Open && p.refs==3);
+  EnterCriticalSection(&p.io);
+  check(L"d41_indep_masks",m36_open_set_event_mask(dataOpen,EV_RXCHAR) && m36_open_set_event_mask(r0Open,EV_RLSD) && dataOpen->eventMask==EV_RXCHAR && r0Open->eventMask==EV_RLSD);
+  LeaveCriticalSection(&p.io);
+  memset(&jData,0,sizeof(jData));jData.o=dataOpen;jData.ready=CreateEvent(NULL,TRUE,FALSE,NULL);
+  memset(&jR0,0,sizeof(jR0));jR0.o=r0Open;jR0.ready=CreateEvent(NULL,TRUE,FALSE,NULL);
+  tData=CreateThread(NULL,0,open_event_blocked,&jData,0,NULL);
+  tR0=CreateThread(NULL,0,open_event_blocked,&jR0,0,NULL);
+  begin=GetTickCount();while((!dataOpen->eventWaiter || !r0Open->eventWaiter) && GetTickCount()-begin<500)Sleep(1);
+  check(L"d41_concurrent_waiters",dataOpen->eventWaiter==1 && r0Open->eventWaiter==1);
+  EnterCriticalSection(&p.io);m36_broadcast_events(&p,EV_RXCHAR);LeaveCriticalSection(&p.io);
+  n=WaitForSingleObject(tData,1000);
+  check(L"d41_rx_only_wakes_data",n==WAIT_OBJECT_0 && jData.result && jData.mask==EV_RXCHAR && WaitForSingleObject(tR0,30)==WAIT_TIMEOUT);
+  CloseHandle(tData);
+  /* Establish baseline RLSD=1 then drop RLSD=0 -> wakes hDevice_r0 WatchForDisconnect */
+  packet[8]=0x03;packet[9]=0;
+  EnterCriticalSection(&p.io);
+  fired=0;m36_update_notify(&p.notifyState,packet,10,1,GetTickCount(),0xFFFFFFFF,&fired);
+  packet[8]=0x02;fired=0;m36_update_notify(&p.notifyState,packet,10,1,GetTickCount(),0xFFFFFFFF,&fired);
+  m36_broadcast_events(&p,fired);
+  LeaveCriticalSection(&p.io);
+  n=WaitForSingleObject(tR0,1000);
+  check(L"d41_rlsd_drop_wakes_r0",n==WAIT_OBJECT_0 && jR0.result && jR0.mask==EV_RLSD && !(m36_modem_status(&p.notifyState)&MS_RLSD_ON) && (m36_modem_status(&p.notifyState)&MS_DSR_ON));
+  CloseHandle(tR0);
+  /* Closing r0 wakes its own waiter cleanly without altering dataOpen mask */
+  ResetEvent(jR0.ready);tR0=CreateThread(NULL,0,open_event_blocked,&jR0,0,NULL);
+  begin=GetTickCount();while(!r0Open->eventWaiter && GetTickCount()-begin<500)Sleep(1);Sleep(20);
+  m36_open_release(r0Open);n=WaitForSingleObject(tR0,1000);
+  check(L"d41_close_r0_wakes_self_preserves_data",n==WAIT_OBJECT_0 && jR0.result && jR0.mask==0 && dataOpen->eventMask==EV_RXCHAR && p.opened==1);
+  CloseHandle(tR0);CloseHandle(jR0.ready);CloseHandle(jData.ready);
+  m36_open_release(dataOpen);check(L"d41_refs_balanced",p.refs==1 && p.opened==0 && p.openList==NULL);
+ }
 #endif
  memset(&p.timeouts,0,sizeof(p.timeouts));memset(&job,0,sizeof(job));job.p=&p;job.ready=CreateEvent(NULL,TRUE,FALSE,NULL);thread=CreateThread(NULL,0,blocked,&job,0,NULL);WaitForSingleObject(job.ready,1000);Sleep(30);SetEvent(parent.stop);n=WaitForSingleObject(thread,1000);check(L"unbounded_read_disconnect",n==WAIT_OBJECT_0 && job.result==(DWORD)-1 && job.error==ERROR_DEVICE_NOT_CONNECTED);if(thread)CloseHandle(thread);CloseHandle(job.ready);
  DeleteCriticalSection(&p.rxIO);DeleteCriticalSection(&p.io);CloseHandle(p.rxReady);CloseHandle(p.eventWake);CloseHandle(parent.stop);

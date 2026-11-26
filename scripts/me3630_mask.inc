@@ -6,3 +6,11 @@ static BOOL m36_set_event_mask(PORT *port,DWORD mask)
  port->eventMask=mask;port->eventEpoch++;port->eventPending&=mask;
  SetEvent(port->eventWake);return TRUE;
 }
+#ifdef COM_DIAG41
+static BOOL m36_open_set_event_mask(M36_OPEN *open,DWORD mask)
+{
+ if(!m36_event_mask_supported(mask))return FALSE;
+ open->eventMask=mask;open->eventEpoch++;open->eventPending&=mask;
+ SetEvent(open->eventWake);return TRUE;
+}
+#endif

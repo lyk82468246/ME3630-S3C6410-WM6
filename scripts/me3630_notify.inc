@@ -37,7 +37,15 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
         valid=m36_parse_notify(data,bytes,port->index,&raw,&status);
         EnterCriticalSection(&port->io);
 #ifdef COM_V18
+#ifdef COM_DIAG41
+        {
+            DWORD fired=0;
+            m36_update_notify(&port->notifyState,data,bytes,port->index,GetTickCount(),0xFFFFFFFF,&fired);
+            if(fired)m36_broadcast_events(port,fired);
+        }
+#else
         m36_update_notify(&port->notifyState,data,bytes,port->index,GetTickCount(),port->eventMask,&port->eventPending);
+#endif
 #ifdef COM_DIAG39
         if(valid)m39_line_record(life,(DWORD)port,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,port->eventMask,port->eventPending);
 #endif
@@ -68,6 +76,9 @@ static DWORD WINAPI serial_notify_probe(LPVOID param)
 #endif
 #ifdef COM_V18
     SetEvent(port->eventWake);
+#ifdef COM_DIAG41
+    m36_wake_all_opens(port);
+#endif
 #endif
     LeaveCriticalSection(&port->io);
 #endif

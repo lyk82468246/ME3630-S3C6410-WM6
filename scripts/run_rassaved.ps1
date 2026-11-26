@@ -1,4 +1,4 @@
-param([switch]$Dial,[switch]$BuildOnly,[ValidateSet(0,38,39)][int]$ExpectedDiagnostic=0,[string]$OutDir)
+param([switch]$Dial,[switch]$BuildOnly,[ValidateSet(0,38,39,40,41)][int]$ExpectedDiagnostic=0,[string]$OutDir)
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE;'+$env:PATH
 $sdk='C:\Program Files (x86)\Windows Mobile 6 SDK\PocketPC'

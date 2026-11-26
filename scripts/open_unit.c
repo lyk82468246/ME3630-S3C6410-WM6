@@ -1,13 +1,22 @@
 #include <windows.h>
 #undef wsprintfW
+#ifdef COM_DIAG41
+struct M36_OPEN_TAG;
+typedef struct {LONG opened,refs;CRITICAL_SECTION io;struct M36_OPEN_TAG *openList;} PORT;
+#else
 typedef struct {LONG opened,refs;} PORT;
+#endif
 static void port_release(PORT *port){InterlockedDecrement(&port->refs);}
 #include "me3630_open.inc"
 static DWORD checks,failures;static HANDLE logFile;
 static void check(LPCWSTR name,BOOL ok){WCHAR s[140];DWORD bytes,n;checks++;if(!ok)failures++;n=wsprintfW(s,L"CHECK %s pass=%lu\r\n",name,ok);WriteFile(logFile,s,n*2,&bytes,NULL);}
 void mainCRTStartup(void)
 {
- PORT p={0,1};M36_OPEN *data,*zero,*zero2,*second;DWORD bytes,n;WCHAR s[180];
+ PORT p;M36_OPEN *data,*zero,*zero2,*second;DWORD bytes,n;WCHAR s[180];
+ memset(&p,0,sizeof(p));p.refs=1;
+#ifdef COM_DIAG41
+ InitializeCriticalSection(&p.io);
+#endif
  logFile=CreateFile(L"\\Temp\\ME3630-open-unit.txt",GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,0,NULL);if(logFile==INVALID_HANDLE_VALUE)ExitProcess(2);
  n=wsprintfW(s,L"OPEN_UNIT start_tick=%lu\r\n",GetTickCount());WriteFile(logFile,s,n*2,&bytes,NULL);
  data=m36_open_new(&p,GENERIC_READ|GENERIC_WRITE);check(L"data_claim",data && p.opened==1 && p.refs==2);if(!data)goto end;
@@ -17,7 +26,15 @@ void mainCRTStartup(void)
  check(L"zero_query_allowed",m36_open_allows_control(zero,0x00223ffc));
  check(L"zero_dcb_denied",!m36_open_allows_control(zero,0x001b0054));
  check(L"zero_purge_denied",!m36_open_allows_control(zero,0x001b0044));
+#ifdef COM_DIAG41
+ check(L"zero_set_mask_allowed",m36_open_allows_control(zero,0x001b0028));
+ check(L"zero_wait_allowed",m36_open_allows_control(zero,0x001b002c));
+ check(L"zero_modem_status_allowed",m36_open_allows_control(zero,0x001b0034));
+ check(L"zero_timeouts_denied",!m36_open_allows_control(zero,0x001b003c));
+ check(L"zero_escape_denied",!m36_open_allows_control(zero,0x001b000c));
+#else
  check(L"zero_wait_denied",!m36_open_allows_control(zero,0x001b002c));
+#endif
  check(L"zero_no_read_write",!(zero->access&(GENERIC_READ|GENERIC_WRITE)));
  check(L"data_controls_unchanged",m36_open_allows_control(data,0x001b0054));
  m36_open_release(zero2);check(L"metadata_close_preserves_owner",p.opened==1 && p.refs==3);
@@ -26,5 +43,8 @@ void mainCRTStartup(void)
  m36_open_release(zero);check(L"old_metadata_not_clear_new_owner",p.opened==1 && p.refs==2);
  if(data)m36_open_release(data);check(L"balanced_refs",p.opened==0 && p.refs==1);
 end:
+#ifdef COM_DIAG41
+ DeleteCriticalSection(&p.io);
+#endif
  n=wsprintfW(s,L"OPEN_UNIT CHECKS=%lu FAILURES=%lu COMPLETE\r\n",checks,failures);WriteFile(logFile,s,n*2,&bytes,NULL);CloseHandle(logFile);ExitProcess(failures?1:0);
 }

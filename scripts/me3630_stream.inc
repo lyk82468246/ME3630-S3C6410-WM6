@@ -2,6 +2,9 @@
  * Device Manager maps stream buffers; USB sees only our local staging buffer.
  * Single opener per channel; remove signals cancellation before taking I/O lock.
  * Parent/port refcounts keep an unplugged open handle safe until Close. */
+#ifdef COM_DIAG41
+struct M36_OPEN_TAG;
+#endif
 typedef struct {
     PROBE *parent;
     USB_PIPE in,out;
@@ -19,6 +22,9 @@ typedef struct {
     CRITICAL_SECTION rxIO,txIO;
 #endif
     LONG refs,opened;
+#ifdef COM_DIAG41
+    struct M36_OPEN_TAG *openList;
+#endif
 #ifdef COM_V9
     HANDLE rxThread,rxReady,eventWake;
     DWORD qHead,qCount,rxFailure;
@@ -73,6 +79,9 @@ static void port_release(PORT *port)
         DeleteCriticalSection(&port->io);LocalFree(port);probe_release(p);
     }
 }
+#ifdef COM_DIAG34
+#include "me3630_open.inc"
+#endif
 #ifdef COM_V4
 #include "me3630_serial.inc"
 #endif
@@ -89,9 +98,6 @@ DWORD M36_Init(DWORD context)
     logline(L"STREAM_INIT ptr=%08lx\r\n",ptr);return ptr;
 }
 BOOL M36_Deinit(DWORD context){port_release((PORT*)context);return TRUE;}
-#ifdef COM_DIAG34
-#include "me3630_open.inc"
-#endif
 #ifdef COM_DIAG38
 static DWORD stream_open_impl(DWORD context,DWORD access,DWORD share)
 #else
@@ -129,7 +135,11 @@ static BOOL stream_close_impl(DWORD context)
 BOOL M36_Close(DWORD context)
 #endif
 {
-#ifdef COM_DIAG34
+#ifdef COM_DIAG41
+    M36_OPEN *open=(M36_OPEN*)context;PORT *port=open->port;
+    logline(L"D41 CLOSE port=%lu open=%08lx owns=%lu opened=%ld refs=%ld\r\n",port->index,(DWORD)open,open->ownsData,port->opened,port->refs);
+    m36_open_release(open);return TRUE;
+#elif defined(COM_DIAG34)
     M36_OPEN *open=(M36_OPEN*)context;PORT *port=open->port;
     if(!open->ownsData){logline(L"D34 CLOSE_METADATA port=%lu opened=%ld\r\n",port->index,port->opened);m36_open_release(open);return TRUE;}
 #else
@@ -219,7 +229,9 @@ static BOOL stream_control_impl(DWORD context,DWORD code,PBYTE in,DWORD inSize,P
 BOOL M36_IOControl(DWORD context,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 #endif
 #ifdef COM_V4
-#ifdef COM_DIAG34
+#ifdef COM_DIAG41
+{M36_OPEN *open=(M36_OPEN*)context;if(!m36_open_allows_control(open,code)){if(actual)*actual=0;SetLastError(ERROR_ACCESS_DENIED);return FALSE;}return serial_control(open,code,in,inSize,out,outSize,actual);}
+#elif defined(COM_DIAG34)
 {M36_OPEN *open=(M36_OPEN*)context;if(!m36_open_allows_control(open,code)){if(actual)*actual=0;SetLastError(ERROR_ACCESS_DENIED);return FALSE;}return serial_control(open->port,code,in,inSize,out,outSize,actual);}
 #else
 {return serial_control((PORT*)context,code,in,inSize,out,outSize,actual);}
@@ -391,7 +403,11 @@ static DWORD WINAPI worker(LPVOID param)
 #ifdef COM_DIAG34R2
 #ifdef COM_DIAG35
 #ifdef COM_DIAG36
-#ifdef COM_DIAG39
+#ifdef COM_DIAG41
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D41.dll",sizeof(L"ME3630ComV18D41.dll"));
+#elif defined(COM_DIAG40)
+        RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D40.dll",sizeof(L"ME3630ComV18D40.dll"));
+#elif defined(COM_DIAG39)
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D39.dll",sizeof(L"ME3630ComV18D39.dll"));
 #elif defined(COM_DIAG38)
         RegSetValueEx(key,L"Dll",0,REG_SZ,(LPBYTE)L"ME3630ComV18D38.dll",sizeof(L"ME3630ComV18D38.dll"));
@@ -566,6 +582,9 @@ static void stream_cleanup(PROBE *p)
              * Never kill a worker or free USB buffer/context underneath it. */
             if(joined!=WAIT_OBJECT_0){logline(L"V9 RETAIN_STUCK_PORT interface=%lu\r\n",port->index);continue;}
         }
+#endif
+#ifdef COM_DIAG41
+        EnterCriticalSection(&port->io);m36_wake_all_opens(port);LeaveCriticalSection(&port->io);
 #endif
         if(port->active && port->active!=INVALID_HANDLE_VALUE){
             BOOL result;DWORD error;LIFE(M37_DEACTIVATE_BEGIN,port,port->active,0);

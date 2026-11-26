@@ -181,8 +181,14 @@ static DWORD serial_io(PORT *port,LPVOID buffer,DWORD count,BOOL input)
 #ifdef COM_DIAG36
 #include "me3630_mask.inc"
 #endif
+#ifdef COM_DIAG41
+static BOOL serial_control(M36_OPEN *open,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
+{
+    PORT *port=open->port;
+#else
 static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out,DWORD outSize,PDWORD actual)
 {
+#endif
     BOOL ok=FALSE;DWORD error=ERROR_INVALID_PARAMETER,lines;DCB dcb;COMMTIMEOUTS timeouts;
 #ifdef COM_DIAG33
     logline(L"D33 IO_ENTER port=%lu pid=%lu code=%08lx in=%lu out=%lu\r\n",port->index,GetCurrentProcessId(),code,inSize,outSize);
@@ -195,20 +201,32 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
     if(actual)*actual=0;
 #ifdef COM_V8
     /* Wait must not hold the configuration lock: SetCommMask cancels it. */
+#ifdef COM_DIAG41
+    if(code==0x001b002c)return serial_wait_event_open(open,out,outSize,actual);
+#else
     if(code==0x001b002c)return serial_wait_event(port,out,outSize,actual);
+#endif
 #endif
     EnterCriticalSection(&port->io);
     if(!serial_alive(port)){LeaveCriticalSection(&port->io);SetLastError(ERROR_DEVICE_NOT_CONNECTED);return FALSE;}
 #ifdef COM_DIAG39
     if(code==0x001b0034 || code==M36_NOTIFY_QUERY)
+#ifdef COM_DIAG41
+        m39_line_record(life,(DWORD)open,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,open->eventMask,open->eventPending);
+#else
         m39_line_record(life,(DWORD)port,port->notifyState.known,port->notifyState.status,port->notifyState.raw,port->notifyState.tick,port->notifyState.error,port->eventMask,port->eventPending);
+#endif
 #endif
     logline(L"V4 IOCTL code=%08lx in=%lu out=%lu\r\n",code,inSize,outSize);
     switch(code) {
 #ifdef COM_DIAG34
     case 0x00223ff4:
         if(!inSize && out && outSize==4){
-#ifdef COM_DIAG39
+#ifdef COM_DIAG41
+            *(DWORD*)out=41;
+#elif defined(COM_DIAG40)
+            *(DWORD*)out=40;
+#elif defined(COM_DIAG39)
             *(DWORD*)out=39;
 #elif defined(COM_DIAG38)
             *(DWORD*)out=38;
@@ -276,7 +294,11 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
         if(out && outSize>=sizeof(DWORD)){*(DWORD*)out=8;if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
 #endif
     case 0x001b0024: /* GetCommMask, measured on this ROM. */
+#ifdef COM_DIAG41
+        if(out && outSize>=sizeof(DWORD)){memcpy(out,&open->eventMask,sizeof(DWORD));if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#else
         if(out && outSize>=sizeof(DWORD)){memcpy(out,&port->eventMask,sizeof(DWORD));if(actual)*actual=sizeof(DWORD);ok=TRUE;}break;
+#endif
     case 0x001b0028: /* SetCommMask: only RXCHAR and zero are supported. */
         if(!in || inSize!=sizeof(DWORD))break;
         memcpy(&lines,in,sizeof(DWORD));
@@ -289,7 +311,12 @@ static BOOL serial_control(PORT *port,DWORD code,PBYTE in,DWORD inSize,PBYTE out
 #else
         if(lines&~EV_RXCHAR){error=ERROR_NOT_SUPPORTED;break;}
 #endif
-#ifdef COM_DIAG36
+#ifdef COM_DIAG41
+        ok=m36_open_set_event_mask(open,lines);
+        LIFE(M38_MASK_STATE,open,open->eventMask,open->eventPending);
+        logline(L"D41 MASK port=%lu open=%08lx mask=%08lx pending=%08lx queued=%lu epoch=%lu\r\n",port->index,(DWORD)open,lines,open->eventPending,port->qCount,open->eventEpoch);
+        break;
+#elif defined(COM_DIAG36)
         ok=m36_set_event_mask(port,lines);
 #ifdef COM_DIAG38
         LIFE(M38_MASK_STATE,port,port->eventMask,port->eventPending);
